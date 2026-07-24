@@ -1,0 +1,993 @@
+<title>Shop Level</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root{
+    --bg:#eef0ec; --panel:#ffffff; --panel2:#f4f5f1; --ink:#191c1f; --muted:#5f666d;
+    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e;
+    --mono:ui-monospace,"Roboto Mono","Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,"Roboto","Segoe UI",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#131518; --panel:#1c1f23; --panel2:#22262b; --ink:#e7eaed; --muted:#8f969e;
+      --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#131518; --panel:#1c1f23; --panel2:#22262b; --ink:#e7eaed; --muted:#8f969e;
+    --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef0ec; --panel:#ffffff; --panel2:#f4f5f1; --ink:#191c1f; --muted:#5f666d;
+    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e;
+  }
+  html,body{height:100%; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); overscroll-behavior:none;
+       -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+       display:flex; flex-direction:column;
+       -webkit-text-size-adjust:100%; text-size-adjust:100%;
+       -webkit-user-select:none; user-select:none;}
+  input, textarea, #view-data td, #calcExpr, #calcRes, #calcAlt{-webkit-user-select:text; user-select:text;}
+  #app{flex:1; min-height:0; width:100%; max-width:520px; margin:0 auto; display:flex; flex-direction:column;}
+  #views{flex:1; min-height:0; position:relative;}
+  .view{position:absolute; inset:0; display:none; flex-direction:column; overflow-y:auto; padding:12px 14px;}
+  .view.active{display:flex;}
+
+  .lbl{font:600 11px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--muted);}
+  .badges{display:flex; gap:8px; align-items:center; min-height:24px; flex-wrap:wrap;}
+  .badge{font:700 11px/1 var(--sans); letter-spacing:.1em; padding:5px 8px; border-radius:5px;
+         border:1.5px solid var(--line); color:var(--muted);}
+  .badge.on{border-color:var(--accent); color:var(--accent);}
+  .badge.good{border-color:var(--good); color:var(--good);}
+
+  /* ---------- LEVEL ---------- */
+  .big-wrap{display:flex; align-items:baseline; justify-content:center; gap:10px; margin:4px 0 0;}
+  .big-arrow{font-size:30px; color:var(--line); transition:color .12s; align-self:center;}
+  .big-arrow.on{color:var(--accent);}
+  #bigAngle{font:600 clamp(58px,21vw,104px)/1 var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+  #bigAngle.level{color:var(--good);}
+  .big-unit{font:500 30px/1 var(--mono); color:var(--muted);}
+  .sub-reads{display:flex; justify-content:center; gap:22px; margin:8px 0 4px; flex-wrap:wrap;}
+  .sub-reads .cell{text-align:center;}
+  .sub-reads b{font:600 19px/1.3 var(--mono); font-variant-numeric:tabular-nums; display:block;}
+  #vialBox{flex:1; min-height:180px; position:relative; margin:6px 0;}
+  #vial{position:absolute; inset:0; width:100%; height:100%;}
+  #sensorMsg{color:var(--muted); font-size:14px; text-align:center; padding:6px 12px;}
+  .btn-row{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+  .tog-row{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; padding-bottom:4px;}
+  .btn{font:700 14px/1 var(--sans); letter-spacing:.08em; padding:15px 6px; border-radius:6px;
+       border:1.5px solid var(--line); background:var(--panel); color:var(--ink); text-align:center; cursor:pointer;}
+  .btn:active{transform:translateY(1px); background:var(--panel2);}
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+  .btn.on{border-color:var(--accent); color:var(--accent); background:var(--panel2);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+
+  /* ---------- RULER ---------- */
+  #rulerBox{flex:1; min-height:0; position:relative; border:1.5px solid var(--line); border-radius:6px;
+            background:var(--panel); overflow:hidden; touch-action:none;}
+  #rulerCanvas{position:absolute; inset:0; width:100%; height:100%;}
+  #rulerRead{position:absolute; right:10px; top:10px; background:var(--panel2); border:1.5px solid var(--line);
+             border-radius:6px; padding:10px 12px; text-align:right; pointer-events:none;}
+  #rulerRead b{font:600 18px/1.4 var(--mono); font-variant-numeric:tabular-nums; display:block;}
+  #rulerRead span{font-size:12px; color:var(--muted);}
+  .ruler-foot{display:flex; gap:8px; margin-top:10px; align-items:center;}
+  .ruler-foot .lbl{flex:1;}
+
+  /* ---------- CALC ---------- */
+  #calcDisplay{border:1.5px solid var(--line); border-radius:6px; background:var(--panel);
+               padding:12px 14px; min-height:108px; display:flex; flex-direction:column; justify-content:flex-end; gap:4px;}
+  #calcExpr{font:500 22px/1.3 var(--mono); word-break:break-all; min-height:29px;}
+  #calcExpr .cur{display:inline-block; width:2px; height:1.1em; background:var(--accent); vertical-align:text-bottom;
+                 animation:blink 1.1s steps(1) infinite;}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion: reduce){ #calcExpr .cur{animation:none;} }
+  #calcRes{font:600 26px/1.2 var(--mono); font-variant-numeric:tabular-nums; color:var(--accent); min-height:32px;}
+  #calcAlt{font:400 13px/1.4 var(--mono); color:var(--muted); min-height:18px;}
+  .chips{display:flex; gap:6px; overflow-x:auto; padding:10px 0 4px; scrollbar-width:none;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{font:600 14px/1 var(--mono); padding:11px 12px; border:1.5px solid var(--line); border-radius:6px;
+        background:var(--panel); color:var(--ink); white-space:nowrap; cursor:pointer;}
+  .chip:active{background:var(--panel2);}
+  #keypad{display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:6px;}
+  .key{font:600 21px/1 var(--mono); padding:16px 0; border-radius:6px; border:1.5px solid var(--line);
+       background:var(--panel); color:var(--ink); text-align:center; cursor:pointer;}
+  .key:active{transform:translateY(1px); background:var(--panel2);}
+  .key:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+  .key.op{color:var(--accent);}
+  .key.eq{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+  .key.small{font-size:15px;}
+  .miter{border:1.5px solid var(--line); border-radius:6px; background:var(--panel); padding:12px 14px; margin-top:12px;}
+  .miter-row{display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;}
+  .miter input{font:600 20px/1 var(--mono); width:90px; padding:10px; border:1.5px solid var(--line);
+               border-radius:6px; background:var(--panel2); color:var(--ink);}
+  .miter input:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  .miter b{font:600 20px/1 var(--mono); color:var(--accent);}
+
+  /* ---------- DATA ---------- */
+  #dataSearch{font:500 17px/1 var(--sans); width:100%; padding:13px 14px; border:1.5px solid var(--line);
+              border-radius:6px; background:var(--panel); color:var(--ink); margin-bottom:10px;}
+  #dataSearch:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  details{border:1.5px solid var(--line); border-radius:6px; background:var(--panel); margin-bottom:10px; overflow:hidden;}
+  summary{font:700 13px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; padding:14px;
+          cursor:pointer; color:var(--ink); list-style:none; display:flex; justify-content:space-between;}
+  summary::after{content:"+"; color:var(--muted); font:600 16px/1 var(--mono);}
+  details[open] summary::after{content:"−";}
+  summary:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
+  .tblwrap{overflow-x:auto;}
+  table{width:100%; border-collapse:collapse; font:400 14.5px/1.35 var(--mono); font-variant-numeric:tabular-nums;}
+  th{font:600 11px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+     text-align:left; padding:6px 14px; border-top:1px solid var(--line);}
+  td{padding:7px 14px; border-top:1px solid var(--line);}
+  td.num{text-align:right;}  th.num{text-align:right;}
+
+  /* ---------- TABBAR ---------- */
+  #tabbar{display:grid; grid-template-columns:repeat(4,1fr); border-top:1.5px solid var(--line);
+          background:var(--panel); padding-bottom:env(safe-area-inset-bottom);}
+  .tab{font:700 12px/1 var(--sans); letter-spacing:.12em; padding:17px 0 15px; text-align:center;
+       color:var(--muted); border:0; border-top:2px solid transparent; background:none; cursor:pointer;}
+  .tab.active{color:var(--accent); border-top-color:var(--accent);}
+  .tab:focus-visible{outline:2px solid var(--accent); outline-offset:-3px;}
+
+  /* ---------- MODALS / TOAST ---------- */
+  .scrim{position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center;
+         justify-content:center; padding:20px; z-index:40;}
+  .scrim[hidden]{display:none;}
+  .modal{background:var(--panel); border:1.5px solid var(--line); border-radius:8px; padding:18px;
+         width:100%; max-width:420px; max-height:88dvh; overflow-y:auto;}
+  .modal h2{font:700 14px/1 var(--sans); letter-spacing:.12em; text-transform:uppercase; margin-bottom:10px;}
+  .modal p{font-size:15px; line-height:1.5; color:var(--ink); margin:8px 0;}
+  .modal .hint{color:var(--muted); font-size:13.5px;}
+  .modal .row{display:flex; gap:8px; margin-top:14px;}
+  .modal .row .btn{flex:1; padding:13px 6px;}
+  #calProg{height:6px; border-radius:3px; background:var(--panel2); overflow:hidden; margin:12px 0 2px; display:none;}
+  #calProg i{display:block; height:100%; width:0%; background:var(--accent);}
+  #cardRect{border:2.5px solid var(--accent); border-radius:10px; margin:14px auto;}
+  #rcSlider{width:100%; accent-color:var(--accent); margin:6px 0;}
+  #toast{position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--ink); color:var(--bg);
+         font:600 14px/1.3 var(--sans); padding:12px 18px; border-radius:6px; z-index:60; max-width:88vw; text-align:center;}
+  #toast[hidden]{display:none;}
+  #permOverlay{position:fixed; inset:0; background:var(--bg); z-index:50; display:flex; flex-direction:column;
+               align-items:center; justify-content:center; gap:16px; padding:24px;}
+  #permOverlay[hidden]{display:none;}
+</style>
+
+<div id="app">
+  <main id="views">
+
+    <!-- ============ LEVEL ============ -->
+    <section class="view active" id="view-level">
+      <div class="badges">
+        <span class="lbl" style="margin-right:auto">Shop Level</span>
+        <span class="badge" id="modeBadge">—</span>
+        <span class="badge on" id="relBadge" hidden>REL</span>
+        <span class="badge good" id="calBadge" hidden>CAL</span>
+        <span class="badge on" id="holdBadge" hidden>HOLD</span>
+      </div>
+      <div class="big-wrap">
+        <span class="big-arrow" id="arrL">◄</span>
+        <span id="bigAngle">--.-</span><span class="big-unit">°</span>
+        <span class="big-arrow" id="arrR">►</span>
+      </div>
+      <div class="sub-reads">
+        <div class="cell"><span class="lbl">Pitch /12</span><b id="pitchRead">--</b></div>
+        <div class="cell"><span class="lbl">Slope %</span><b id="slopeRead">--</b></div>
+        <div class="cell" id="axisCell" hidden><span class="lbl">X / Y</span><b id="axisRead">--</b></div>
+      </div>
+      <div id="vialBox"><canvas id="vial"></canvas></div>
+      <p id="sensorMsg"></p>
+      <div class="btn-row">
+        <button class="btn" id="btnHold">HOLD</button>
+        <button class="btn" id="btnZero">ZERO</button>
+        <button class="btn" id="btnCal">CAL</button>
+        <button class="btn" id="btnFull">FULL</button>
+      </div>
+      <div class="tog-row">
+        <button class="btn" id="btnWake">SCREEN AWAKE</button>
+        <button class="btn" id="btnHaptic">HAPTICS</button>
+      </div>
+    </section>
+
+    <!-- ============ RULER ============ -->
+    <section class="view" id="view-ruler">
+      <div class="badges" style="margin-bottom:10px">
+        <span class="lbl" style="margin-right:auto">Ruler</span>
+        <span class="badge good" id="rulerCalBadge" hidden>CAL</span>
+      </div>
+      <div id="rulerBox">
+        <canvas id="rulerCanvas"></canvas>
+        <div id="rulerRead"><b id="rrIn">--</b><b id="rrMm">--</b><span>drag the orange line</span></div>
+      </div>
+      <div class="ruler-foot">
+        <span class="lbl">Align the work with the 0 line</span>
+        <button class="btn" id="btnRulerCal" style="padding:12px 16px">CALIBRATE</button>
+      </div>
+    </section>
+
+    <!-- ============ CALC ============ -->
+    <section class="view" id="view-calc">
+      <div class="badges" style="margin-bottom:10px"><span class="lbl">Fraction Calculator · inches</span></div>
+      <div id="calcDisplay">
+        <div id="calcExpr"><span class="cur"></span></div>
+        <div id="calcRes"></div>
+        <div id="calcAlt"></div>
+      </div>
+      <div class="chips" id="fracChips"></div>
+      <div id="keypad">
+        <button class="key small" data-k="C">C</button>
+        <button class="key small" data-k="(">(</button>
+        <button class="key small" data-k=")">)</button>
+        <button class="key small" data-k="B">⌫</button>
+        <button class="key" data-k="7">7</button>
+        <button class="key" data-k="8">8</button>
+        <button class="key" data-k="9">9</button>
+        <button class="key op" data-k="÷">÷</button>
+        <button class="key" data-k="4">4</button>
+        <button class="key" data-k="5">5</button>
+        <button class="key" data-k="6">6</button>
+        <button class="key op" data-k="×">×</button>
+        <button class="key" data-k="1">1</button>
+        <button class="key" data-k="2">2</button>
+        <button class="key" data-k="3">3</button>
+        <button class="key op" data-k="−">−</button>
+        <button class="key" data-k="0">0</button>
+        <button class="key" data-k=".">.</button>
+        <button class="key" data-k=" ">⎵</button>
+        <button class="key op" data-k="+">+</button>
+        <button class="key small" data-k="mm">mm</button>
+        <button class="key op" data-k="/">⁄</button>
+        <button class="key small" data-k="A">ANS</button>
+        <button class="key eq" data-k="=">=</button>
+      </div>
+      <p class="lbl" style="margin-top:8px">⎵ separates whole &amp; fraction — 3⎵1⁄2 = 3 1/2″ · “mm” tags a number as millimetres</p>
+      <div class="miter">
+        <span class="lbl">Miter helper</span>
+        <div class="miter-row">
+          <label for="miterIn" style="font-size:15px">Corner angle</label>
+          <input id="miterIn" type="number" inputmode="decimal" value="90" min="1" max="179">
+          <span style="font-size:15px">→ cut each piece at <b id="miterOut">45.0°</b></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DATA ============ -->
+    <section class="view" id="view-data">
+      <div class="badges" style="margin-bottom:10px"><span class="lbl">Reference Data</span></div>
+      <input id="dataSearch" type="search" placeholder="Search — e.g. 1/4-20, M8, #29, 0.257" autocomplete="off">
+      <details open id="secTap">
+        <summary>Tap drill sizes</summary>
+        <div class="tblwrap"><table id="tblTap"></table></div>
+      </details>
+      <details id="secFrac">
+        <summary>Fraction · decimal · mm</summary>
+        <div class="tblwrap"><table id="tblFrac"></table></div>
+      </details>
+      <details id="secDrill">
+        <summary>Number &amp; letter drills</summary>
+        <div class="tblwrap"><table id="tblDrill"></table></div>
+      </details>
+    </section>
+  </main>
+
+  <nav id="tabbar">
+    <button class="tab active" data-v="level">LEVEL</button>
+    <button class="tab" data-v="ruler">RULER</button>
+    <button class="tab" data-v="calc">CALC</button>
+    <button class="tab" data-v="data">DATA</button>
+  </nav>
+</div>
+
+<!-- Sensor calibration modal -->
+<div class="scrim" id="calModal" hidden>
+  <div class="modal">
+    <h2 id="calTitle">True-zero calibration</h2>
+    <p id="calText"></p>
+    <div id="calProg"><i></i></div>
+    <p class="hint" id="calHint"></p>
+    <div class="row">
+      <button class="btn" id="calCancel">CANCEL</button>
+      <button class="btn" id="calClear">CLEAR CAL</button>
+      <button class="btn primary" id="calGo">START</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ruler calibration modal -->
+<div class="scrim" id="rulerModal" hidden>
+  <div class="modal">
+    <h2>Ruler calibration</h2>
+    <p>Hold any standard bank card against the screen and adjust until the outline matches its edges exactly.</p>
+    <div id="cardRect"></div>
+    <input id="rcSlider" type="range" min="0.70" max="1.30" step="0.0005">
+    <p class="hint" id="rcInfo"></p>
+    <div class="row">
+      <button class="btn" id="rcCancel">CANCEL</button>
+      <button class="btn" id="rcReset">RESET</button>
+      <button class="btn primary" id="rcSave">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<div id="permOverlay" hidden>
+  <span class="lbl">Shop Level</span>
+  <p style="text-align:center;max-width:300px">This device requires permission to read the motion sensor.</p>
+  <button class="btn primary" id="permBtn" style="padding:16px 28px">ENABLE SENSORS</button>
+</div>
+
+<div id="toast" hidden></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const DEG = 180/Math.PI;
+const store = {
+  get(k,f){ try{ const v=localStorage.getItem("sl."+k); return v==null?f:JSON.parse(v);}catch(e){return f;} },
+  set(k,v){ try{ localStorage.setItem("sl."+k, JSON.stringify(v)); }catch(e){} }
+};
+let toastT=null;
+function toast(msg,ms){ const t=$("toast"); t.textContent=msg; t.hidden=false;
+  clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, ms||2600); }
+
+/* ============================= TABS ============================= */
+const tabs=[...document.querySelectorAll(".tab")];
+tabs.forEach(b=>b.addEventListener("click",()=>{
+  tabs.forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  $("view-"+b.dataset.v).classList.add("active");
+  if(b.dataset.v==="ruler") sizeRuler();
+}));
+
+/* ============================= SENSOR PIPELINE ============================= */
+let raw=null, sm=null, gotData=false, mode=null;
+let hold=false, rel={flat:null,edgeY:null,edgeX:null};
+let cal = store.get("cal", {flat:{x:0,y:0}, edgeY:0, edgeX:0, done:{flat:false,edgeY:false,edgeX:false}});
+let haptic = store.get("haptic", true);
+let wasLevel=false, lastVib=0;
+const LEVEL_TOL = 0.15;             // degrees considered "level"
+
+function onMotion(e){
+  const a=e.accelerationIncludingGravity;
+  if(!a || a.x==null) return;
+  gotData=true;
+  raw={x:a.x, y:a.y, z:a.z};
+  if(!sm){ sm={...raw}; return; }
+  // adaptive low-pass: quick when moving, heavy damping when settling
+  const d=Math.hypot(raw.x-sm.x, raw.y-sm.y, raw.z-sm.z);
+  const al=clamp(0.035 + d*0.09, 0.035, 0.5);
+  sm.x+=(raw.x-sm.x)*al; sm.y+=(raw.y-sm.y)*al; sm.z+=(raw.z-sm.z)*al;
+  if(capturing) capSamples.push(normVec(raw));
+}
+function normVec(v){ const g=Math.hypot(v.x,v.y,v.z)||1; return {x:v.x/g, y:v.y/g, z:v.z/g}; }
+function fold(a){ if(a>90) return a-180; if(a<-90) return a+180; return a; }
+
+function pickMode(u){
+  const m={flat:Math.abs(u.z), edgeY:Math.abs(u.y), edgeX:Math.abs(u.x)};
+  if(!mode){ mode = Object.keys(m).sort((a,b)=>m[b]-m[a])[0]; return; }
+  for(const k of ["flat","edgeY","edgeX"])
+    if(k!==mode && m[k] > m[mode]*1.25) mode=k;
+}
+
+// current corrected reading; recomputed every frame from smoothed vector
+let state={mode:"flat", angle:0, aX:0, aY:0, level:false, bubX:0, bubY:0, ok:false};
+
+function compute(){
+  if(!sm) return;
+  const u=normVec(sm);
+  pickMode(u);
+  const s={mode, ok:true};
+  const orient = (screen.orientation && screen.orientation.angle) || 0;
+  const flip = (orient===180||orient===270)? -1 : 1;
+  if(mode==="flat"){
+    let cx=u.x-cal.flat.x, cy=u.y-cal.flat.y;
+    if(rel.flat){ cx-=rel.flat.x; cy-=rel.flat.y; }
+    const az=Math.max(Math.abs(u.z),1e-6);
+    s.aX = Math.atan2(cx,az)*DEG;
+    s.aY = Math.atan2(cy,az)*DEG;
+    s.angle = Math.atan2(Math.hypot(cx,cy), az)*DEG;
+    s.bubX = s.aX*flip; s.bubY = s.aY*flip;
+  }else{
+    let r = (mode==="edgeY") ? fold(Math.atan2(u.x,u.y)*DEG) : fold(Math.atan2(u.y,u.x)*DEG);
+    r -= cal[mode];
+    if(rel[mode]!=null) r -= rel[mode];
+    s.angle = Math.abs(r);
+    s.signed = r*flip;
+  }
+  s.level = s.angle <= LEVEL_TOL;
+  state=s;
+  if(s.level && !wasLevel && haptic && navigator.vibrate && Date.now()-lastVib>500){
+    navigator.vibrate(18); lastVib=Date.now();
+  }
+  wasLevel=s.level;
+}
+
+/* ============================= LEVEL UI ============================= */
+const bigAngle=$("bigAngle"), pitchRead=$("pitchRead"), slopeRead=$("slopeRead");
+const axisCell=$("axisCell"), axisRead=$("axisRead"), modeBadge=$("modeBadge");
+const arrL=$("arrL"), arrR=$("arrR");
+const vial=$("vial"); const vctx=vial.getContext("2d");
+let frozen=null;
+
+function fmt1(v){ return (Math.round(v*10)/10).toFixed(1); }
+
+function updateReadouts(){
+  const s = hold && frozen ? frozen : state;
+  if(!s.ok) return;
+  modeBadge.textContent = s.mode==="flat" ? "SURFACE" : "EDGE";
+  $("calBadge").hidden = !cal.done[s.mode];
+  bigAngle.textContent = fmt1(s.angle);
+  bigAngle.classList.toggle("level", s.level);
+  const t=Math.tan(s.angle/DEG);
+  pitchRead.textContent = s.angle>85 ? "—" : (12*t).toFixed(1);
+  slopeRead.textContent = s.angle>85 ? "—" : (100*t).toFixed(1);
+  if(s.mode==="flat"){
+    axisCell.hidden=false;
+    axisRead.textContent = fmt1(s.aX)+" / "+fmt1(s.aY);
+    arrL.classList.remove("on"); arrR.classList.remove("on");
+  }else{
+    axisCell.hidden=true;
+    arrL.classList.toggle("on", s.signed>LEVEL_TOL);
+    arrR.classList.toggle("on", s.signed<-LEVEL_TOL);
+  }
+}
+
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+let vw=0, vh=0, dpr=1;
+function sizeVial(){
+  const box=$("vialBox");
+  dpr=window.devicePixelRatio||1;
+  vw=box.clientWidth; vh=box.clientHeight;
+  vial.width=Math.round(vw*dpr); vial.height=Math.round(vh*dpr);
+  vctx.setTransform(dpr,0,0,dpr,0,0);
+}
+new ResizeObserver(sizeVial).observe($("vialBox"));
+
+function drawVial(){
+  const s = hold && frozen ? frozen : state;
+  vctx.clearRect(0,0,vw,vh);
+  if(!s.ok || vw<10) return;
+  const line=cssVar("--line"), ink=cssVar("--ink"), muted=cssVar("--muted"),
+        accent=cssVar("--accent"), good=cssVar("--good"), panel2=cssVar("--panel2");
+  const col = s.level? good : accent;
+  if(s.mode==="flat") drawBullseye(s,{line,ink,muted,accent,good,panel2,col});
+  else drawBar(s,{line,ink,muted,accent,good,panel2,col});
+}
+
+function drawBullseye(s,c){
+  const cx=vw/2, cy=vh/2, R=Math.min(vw,vh)/2-10, pxDeg=R/3;   // 3° full scale
+  vctx.lineWidth=1.5;
+  for(let i=1;i<=3;i++){
+    vctx.beginPath(); vctx.arc(cx,cy,pxDeg*i,0,7); vctx.strokeStyle=c.line; vctx.stroke();
+    vctx.fillStyle=c.muted; vctx.font="11px "+getComputedStyle(bigAngle).fontFamily;
+    vctx.fillText(i+"°", cx+pxDeg*i-16, cy-5);
+  }
+  vctx.beginPath(); vctx.moveTo(cx-R,cy); vctx.lineTo(cx+R,cy);
+  vctx.moveTo(cx,cy-R); vctx.lineTo(cx,cy+R); vctx.strokeStyle=c.line; vctx.stroke();
+  // centre gate
+  vctx.beginPath(); vctx.arc(cx,cy,14+LEVEL_TOL*pxDeg,0,7);
+  vctx.strokeStyle=s.level?c.good:c.muted; vctx.lineWidth=2; vctx.stroke();
+  // bubble floats toward the high side
+  const m=Math.hypot(s.bubX,s.bubY), mc=Math.min(m,3.4);
+  const k=m>0? mc/m : 0;
+  const bx=cx+s.bubX*k*pxDeg, by=cy-s.bubY*k*pxDeg;
+  vctx.beginPath(); vctx.arc(bx,by,13,0,7);
+  vctx.fillStyle=c.col; vctx.globalAlpha=.9; vctx.fill(); vctx.globalAlpha=1;
+  vctx.beginPath(); vctx.arc(bx-4,by-4,4,0,7); vctx.fillStyle="rgba(255,255,255,.55)"; vctx.fill();
+}
+
+function drawBar(s,c){
+  // horizontal vial across the canvas; ±5° full scale
+  const cy=vh/2, half=vw/2-24, pxDeg=(half-30)/5, cx=vw/2;
+  const H=76, r=H/2;
+  vctx.lineWidth=1.5; vctx.strokeStyle=c.line;
+  roundRect(cx-half,cy-r,half*2,H,r); vctx.fillStyle=c.panel2; vctx.fill(); vctx.stroke();
+  // degree ticks
+  vctx.strokeStyle=c.line; vctx.beginPath();
+  for(let d=-5;d<=5;d++){
+    const x=cx+d*pxDeg, l=d===0?0:(d%5===0?16:10);
+    if(d!==0){ vctx.moveTo(x,cy-r); vctx.lineTo(x,cy-r+l); vctx.moveTo(x,cy+r); vctx.lineTo(x,cy+r-l); }
+  }
+  vctx.stroke();
+  vctx.fillStyle=c.muted; vctx.font="11px "+getComputedStyle(bigAngle).fontFamily;
+  vctx.fillText("5°",cx-5*pxDeg-6,cy-r-6); vctx.fillText("5°",cx+5*pxDeg-6,cy-r-6);
+  // centre gate lines
+  const gate=20+LEVEL_TOL*pxDeg;
+  vctx.strokeStyle=s.level?c.good:c.muted; vctx.lineWidth=2;
+  vctx.beginPath();
+  vctx.moveTo(cx-gate,cy-r-4); vctx.lineTo(cx-gate,cy+r+4);
+  vctx.moveTo(cx+gate,cy-r-4); vctx.lineTo(cx+gate,cy+r+4);
+  vctx.stroke();
+  // bubble — floats toward the high side
+  const a=clamp(s.signed??0,-5.4,5.4);
+  const bx=cx + a*pxDeg;
+  vctx.beginPath(); vctx.arc(bx,cy,18,0,7);
+  vctx.fillStyle=c.col; vctx.globalAlpha=.9; vctx.fill(); vctx.globalAlpha=1;
+  vctx.beginPath(); vctx.arc(bx-6,cy-6,5,0,7); vctx.fillStyle="rgba(255,255,255,.55)"; vctx.fill();
+  if(Math.abs(s.signed??0)>5.4){
+    vctx.fillStyle=c.accent; vctx.font="600 18px "+getComputedStyle(bigAngle).fontFamily;
+    vctx.fillText(s.signed>0?"◄◄":"►►", s.signed>0? cx-half+8 : cx+half-40, cy+6);
+  }
+}
+function roundRect(x,y,w,h,r){ vctx.beginPath();
+  vctx.moveTo(x+r,y); vctx.arcTo(x+w,y,x+w,y+h,r); vctx.arcTo(x+w,y+h,x,y+h,r);
+  vctx.arcTo(x,y+h,x,y,r); vctx.arcTo(x,y,x+w,y,r); vctx.closePath(); }
+
+function loop(){
+  if(!hold) { compute(); }
+  if($("view-level").classList.contains("active")){ updateReadouts(); drawVial(); }
+  requestAnimationFrame(loop);
+}
+
+/* ============================= LEVEL BUTTONS ============================= */
+$("btnHold").addEventListener("click",()=>{
+  hold=!hold;
+  if(hold) frozen={...state};
+  $("btnHold").classList.toggle("on",hold);
+  $("holdBadge").hidden=!hold;
+});
+$("btnZero").addEventListener("click",()=>{
+  const any = rel.flat||rel.edgeY!=null||rel.edgeX!=null;
+  if(any){ rel={flat:null,edgeY:null,edgeX:null}; $("relBadge").hidden=true; $("btnZero").classList.remove("on");
+    toast("Relative zero cleared"); return; }
+  if(!state.ok) return;
+  if(state.mode==="flat"){
+    const u=normVec(sm);
+    rel.flat={x:u.x-cal.flat.x, y:u.y-cal.flat.y};
+  }else{
+    const u=normVec(sm);
+    const r=(state.mode==="edgeY"?fold(Math.atan2(u.x,u.y)*DEG):fold(Math.atan2(u.y,u.x)*DEG))-cal[state.mode];
+    rel[state.mode]=r;
+  }
+  $("relBadge").hidden=false; $("btnZero").classList.add("on");
+  toast("Zeroed — measuring relative to this position");
+});
+$("btnHaptic").addEventListener("click",()=>{
+  haptic=!haptic; store.set("haptic",haptic);
+  $("btnHaptic").classList.toggle("on",haptic);
+});
+$("btnHaptic").classList.toggle("on",haptic);
+
+let wakeLock=null, wantWake=false;
+async function acquireWake(){
+  try{ wakeLock=await navigator.wakeLock.request("screen");
+       wakeLock.addEventListener("release",()=>{wakeLock=null;});
+  }catch(e){ wantWake=false; $("btnWake").classList.remove("on"); toast("Screen wake lock unavailable"); }
+}
+$("btnWake").addEventListener("click",async()=>{
+  wantWake=!wantWake;
+  $("btnWake").classList.toggle("on",wantWake);
+  if(wantWake) acquireWake();
+  else if(wakeLock){ wakeLock.release(); wakeLock=null; }
+});
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible" && wantWake && !wakeLock) acquireWake();
+});
+
+$("btnFull").addEventListener("click",async()=>{
+  try{
+    if(!document.fullscreenElement){
+      await document.documentElement.requestFullscreen();
+      $("btnFull").classList.add("on");
+      if(screen.orientation && screen.orientation.lock) screen.orientation.lock("portrait").catch(()=>{});
+    }else{
+      await document.exitFullscreen();
+      $("btnFull").classList.remove("on");
+    }
+  }catch(e){ toast("Fullscreen unavailable"); }
+});
+document.addEventListener("fullscreenchange",()=>{
+  $("btnFull").classList.toggle("on", !!document.fullscreenElement);
+});
+
+/* ============================= CALIBRATION ============================= */
+let capturing=false, capSamples=[], calStep=0, calMode=null, cap1=null;
+const calModal=$("calModal"), calText=$("calText"), calHint=$("calHint"), calGo=$("calGo");
+
+$("btnCal").addEventListener("click",()=>{
+  if(!gotData){ toast("No sensor data yet"); return; }
+  calStep=0; calMode=mode; cap1=null;
+  calText.textContent = calMode==="flat"
+    ? "Set the phone flat on a still surface — it does not need to be perfectly level. Don't touch the phone during capture."
+    : "Stand the phone on this edge against a still surface — it does not need to be perfectly level. Don't touch the phone during capture.";
+  calHint.textContent = "Calibrating: "+(calMode==="flat"?"SURFACE (flat) mode":"EDGE mode")+
+    (cal.done[calMode]?" — currently calibrated":"");
+  calGo.textContent="START"; $("calProg").style.display="none";
+  calModal.hidden=false;
+});
+$("calCancel").addEventListener("click",()=>{ capturing=false; calModal.hidden=true; });
+$("calClear").addEventListener("click",()=>{
+  if(calMode==="flat") cal.flat={x:0,y:0}; else cal[calMode]=0;
+  cal.done[calMode]=false; store.set("cal",cal);
+  calModal.hidden=true; toast("Calibration cleared for this mode");
+});
+calGo.addEventListener("click",()=>{
+  if(calStep===0 || calStep===1) runCapture();
+});
+function runCapture(){
+  if(mode!==calMode){ toast("Phone position changed — set it back and retry"); return; }
+  capSamples=[]; capturing=true;
+  $("calProg").style.display="block";
+  calGo.disabled=true;
+  const bar=$("calProg").firstElementChild, t0=Date.now(), DUR=1800;
+  const iv=setInterval(()=>{
+    bar.style.width=Math.min(100,(Date.now()-t0)/DUR*100)+"%";
+    if(Date.now()-t0>=DUR){
+      clearInterval(iv); capturing=false; calGo.disabled=false;
+      finishCapture();
+    }
+  },50);
+}
+function meanCap(){
+  const n=capSamples.length||1;
+  const mx=capSamples.reduce((a,s)=>a+s.x,0)/n, my=capSamples.reduce((a,s)=>a+s.y,0)/n,
+        mz=capSamples.reduce((a,s)=>a+s.z,0)/n;
+  let val, dev=0;
+  if(calMode==="flat"){
+    val={x:mx,y:my};
+    dev=Math.sqrt(capSamples.reduce((a,s)=>a+(s.x-mx)**2+(s.y-my)**2,0)/n);
+  }else{
+    const angs=capSamples.map(s=> calMode==="edgeY"? fold(Math.atan2(s.x,s.y)*DEG) : fold(Math.atan2(s.y,s.x)*DEG));
+    const ma=angs.reduce((a,b)=>a+b,0)/n;
+    val=ma;
+    dev=Math.sqrt(angs.reduce((a,b)=>a+(b-ma)**2,0)/n)/57;  // rough rad-equivalent for shared threshold
+  }
+  return {val,dev,n};
+}
+function finishCapture(){
+  const m=meanCap();
+  if(m.n<20 || m.dev>0.012){
+    $("calProg").style.display="none";
+    toast("Too much movement — keep the phone still and try again"); return;
+  }
+  if(calStep===0){
+    cap1=m.val; calStep=1;
+    $("calProg").style.display="none"; $("calProg").firstElementChild.style.width="0%";
+    calText.textContent="Now rotate the phone exactly 180° — same spot on the surface, same face against it — and capture again.";
+    calGo.textContent="CAPTURE 2";
+  }else{
+    let residual;
+    if(calMode==="flat"){
+      cal.flat={x:(cap1.x+m.val.x)/2, y:(cap1.y+m.val.y)/2};
+      residual=Math.hypot(cap1.x-m.val.x, cap1.y-m.val.y)/2*DEG;
+    }else{
+      cal[calMode]=(cap1+m.val)/2;
+      residual=Math.abs(cap1-m.val)/2;
+    }
+    cal.done[calMode]=true; store.set("cal",cal);
+    calModal.hidden=true;
+    toast("Calibrated ✓ (surface was "+ (calMode==="flat"? (residual).toFixed(2) : residual.toFixed(2)) +"° off level — that's fine)");
+  }
+}
+
+/* ============================= RULER ============================= */
+const rulerCanvas=$("rulerCanvas"), rctx=rulerCanvas.getContext("2d");
+const BASE_PXMM=96/25.4;
+let rulerF=store.get("rulerF",1), markerMm=50.8;
+$("rulerCalBadge").hidden = rulerF===1;
+function pxPerMm(){ return BASE_PXMM*rulerF; }
+let rw=0, rh=0;
+function sizeRuler(){
+  const box=$("rulerBox"); if(!box.clientWidth) return;
+  const d=window.devicePixelRatio||1;
+  rw=box.clientWidth; rh=box.clientHeight;
+  rulerCanvas.width=Math.round(rw*d); rulerCanvas.height=Math.round(rh*d);
+  rctx.setTransform(d,0,0,d,0,0);
+  drawRuler();
+}
+new ResizeObserver(()=>sizeRuler()).observe($("rulerBox"));
+
+const Y0=26;
+function drawRuler(){
+  if(rw<10) return;
+  rctx.clearRect(0,0,rw,rh);
+  const line=cssVar("--line"), ink=cssVar("--ink"), muted=cssVar("--muted"), accent=cssVar("--accent");
+  const pm=pxPerMm(), mono=getComputedStyle(bigAngle).fontFamily;
+  // zero line
+  rctx.strokeStyle=ink; rctx.lineWidth=2;
+  rctx.beginPath(); rctx.moveTo(0,Y0); rctx.lineTo(rw,Y0); rctx.stroke();
+  rctx.fillStyle=muted; rctx.font="11px "+mono; rctx.fillText("0",rw/2-4,Y0-8);
+  // inches, left side — 1/16 steps
+  rctx.strokeStyle=ink; rctx.lineWidth=1;
+  rctx.beginPath();
+  const maxIn=(rh-Y0)/(pm*25.4);
+  for(let i=1;i<=Math.floor(maxIn*16);i++){
+    const y=Y0+i/16*25.4*pm;
+    let l=12;
+    if(i%16===0) l=54; else if(i%8===0) l=40; else if(i%4===0) l=28; else if(i%2===0) l=19;
+    rctx.moveTo(0,y); rctx.lineTo(l,y);
+  }
+  rctx.stroke();
+  rctx.fillStyle=ink; rctx.font="600 15px "+mono;
+  for(let i=1;i<=Math.floor(maxIn);i++) rctx.fillText(String(i),58,Y0+i*25.4*pm+5);
+  // mm, right side
+  rctx.strokeStyle=ink;
+  rctx.beginPath();
+  const maxMm=(rh-Y0)/pm;
+  for(let m=1;m<=Math.floor(maxMm);m++){
+    const y=Y0+m*pm;
+    let l=10; if(m%10===0) l=34; else if(m%5===0) l=22;
+    rctx.moveTo(rw,y); rctx.lineTo(rw-l,y);
+  }
+  rctx.stroke();
+  rctx.fillStyle=ink; rctx.font="600 13px "+mono;
+  for(let m=10;m<=Math.floor(maxMm);m+=10){
+    const t=String(m/10); rctx.fillText(t, rw-38-t.length*8, Y0+m*pm+4);
+  }
+  rctx.fillStyle=muted; rctx.font="10px "+mono;
+  rctx.fillText("in",6,rh-8); rctx.fillText("cm",rw-22,rh-8);
+  // marker
+  const my=Y0+markerMm*pm;
+  if(my<rh){
+    rctx.strokeStyle=accent; rctx.lineWidth=2;
+    rctx.beginPath(); rctx.moveTo(0,my); rctx.lineTo(rw,my); rctx.stroke();
+    rctx.beginPath(); rctx.arc(rw/2,my,13,0,7); rctx.fillStyle=accent; rctx.fill();
+  }
+  updateRulerRead();
+}
+function fmtInFrac(vin){
+  const t=Math.round(vin*32); const g=(a,b)=>b?g(b,a%b):a;
+  const d=g(t,32)||1, n=t/d, den=32/d;
+  const w=Math.floor(n/den), rem=n-w*den;
+  let s = den===1? String(n) : (w? w+" ":"")+rem+"/"+den;
+  return s;
+}
+function updateRulerRead(){
+  const vin=markerMm/25.4;
+  $("rrIn").textContent=fmtInFrac(vin)+"″  ("+vin.toFixed(3)+")";
+  $("rrMm").textContent=markerMm.toFixed(1)+" mm";
+}
+let dragging=false;
+function rulerPoint(e){
+  const r=$("rulerBox").getBoundingClientRect();
+  const y=clamp(e.clientY-r.top, Y0, rh);
+  markerMm=(y-Y0)/pxPerMm();
+  drawRuler();
+}
+$("rulerBox").addEventListener("pointerdown",e=>{ dragging=true; $("rulerBox").setPointerCapture(e.pointerId); rulerPoint(e); });
+$("rulerBox").addEventListener("pointermove",e=>{ if(dragging) rulerPoint(e); });
+$("rulerBox").addEventListener("pointerup",()=>dragging=false);
+
+const rulerModal=$("rulerModal"), rcSlider=$("rcSlider"), cardRect=$("cardRect"), rcInfo=$("rcInfo");
+let tmpF=1;
+$("btnRulerCal").addEventListener("click",()=>{
+  tmpF=rulerF; rcSlider.value=tmpF; updCard(); rulerModal.hidden=false;
+});
+function updCard(){
+  const pm=BASE_PXMM*tmpF;
+  cardRect.style.width=(53.98*pm)+"px";
+  cardRect.style.height=(85.6*pm)+"px";
+  rcInfo.textContent="Scale "+(tmpF*100).toFixed(1)+"% · "+(pm).toFixed(2)+" px/mm";
+}
+rcSlider.addEventListener("input",()=>{ tmpF=parseFloat(rcSlider.value); updCard(); });
+$("rcCancel").addEventListener("click",()=>rulerModal.hidden=true);
+$("rcReset").addEventListener("click",()=>{ tmpF=1; rcSlider.value=1; updCard(); });
+$("rcSave").addEventListener("click",()=>{
+  rulerF=tmpF; store.set("rulerF",rulerF);
+  $("rulerCalBadge").hidden = rulerF===1;
+  rulerModal.hidden=true; drawRuler(); toast("Ruler calibrated");
+});
+
+/* ============================= CALC ============================= */
+const gcd=(a,b)=>b?gcd(b,a%b):a;
+function R(n,d){ if(d===0) throw "div0"; if(d<0){n=-n;d=-d;} const g=gcd(Math.abs(Math.round(n)),Math.round(d))||1;
+  return {n:Math.round(n)/g, d:Math.round(d)/g}; }
+const radd=(a,b)=>R(a.n*b.d+b.n*a.d, a.d*b.d);
+const rsub=(a,b)=>R(a.n*b.d-b.n*a.d, a.d*b.d);
+const rmul=(a,b)=>R(a.n*b.n, a.d*b.d);
+const rdiv=(a,b)=>{ if(b.n===0) throw "div0"; return R(a.n*b.d, a.d*b.n); };
+
+function parseDec(str){
+  if(!/^\d*\.?\d*$/.test(str)||str===""||str===".") throw "num";
+  const parts=str.split("."); const a=parts[0]||"0", b=parts[1]||"";
+  return R(parseInt(a+b||"0",10), Math.pow(10,b.length));
+}
+function tokenize(s){
+  const toks=[]; let i=0;
+  const isD=c=>c>="0"&&c<="9";
+  while(i<s.length){
+    const c=s[i];
+    if(c===" "){ i++; continue; }
+    if("+−×÷()".includes(c)){ toks.push({t:c}); i++; continue; }
+    if(c==="-"){ toks.push({t:"−"}); i++; continue; }
+    if(isD(c)||c==="."){
+      let j=i; while(j<s.length&&(isD(s[j])||s[j]===".")) j++;
+      let v=parseDec(s.slice(i,j)); let k=j;
+      if(s[k]==="/"){
+        let m=k+1, mm=m; while(mm<s.length&&isD(s[mm])) mm++;
+        if(mm===m) throw "frac";
+        v=rdiv(v, R(parseInt(s.slice(m,mm),10),1)); k=mm;
+      }else{
+        let m=k; while(s[m]===" ") m++;
+        let mm=m; while(mm<s.length&&isD(s[mm])) mm++;
+        if(mm>m && s[mm]==="/"){
+          let p=mm+1, pp=p; while(pp<s.length&&isD(s[pp])) pp++;
+          if(pp>p){ v=radd(v, R(parseInt(s.slice(m,mm),10), parseInt(s.slice(p,pp),10))); k=pp; }
+        }
+      }
+      let m2=k; while(s[m2]===" ") m2++;
+      if(s.slice(m2,m2+2)==="mm"){ v=rmul(v, R(10,254)); k=m2+2; }
+      toks.push({t:"n", v}); i=k; continue;
+    }
+    throw "tok";
+  }
+  return toks;
+}
+function parseExpr(toks){
+  let p=0;
+  function expr(){ let v=term();
+    while(toks[p]&&(toks[p].t==="+"||toks[p].t==="−")){ const o=toks[p++].t; const r=term();
+      v=o==="+"?radd(v,r):rsub(v,r); } return v; }
+  function term(){ let v=fact();
+    while(toks[p]&&(toks[p].t==="×"||toks[p].t==="÷")){ const o=toks[p++].t; const r=fact();
+      v=o==="×"?rmul(v,r):rdiv(v,r); } return v; }
+  function fact(){ const t=toks[p]; if(!t) throw "end";
+    if(t.t==="−"){ p++; return rsub(R(0,1),fact()); }
+    if(t.t==="n"){ p++; return t.v; }
+    if(t.t==="("){ p++; const v=expr(); if(!toks[p]||toks[p].t!==")") throw "paren"; p++; return v; }
+    throw "fact"; }
+  const v=expr(); if(p!==toks.length) throw "trail"; return v;
+}
+function mixedStr(n,d){
+  if(d===1) return String(n);
+  const w=Math.floor(n/d), rem=n-w*d;
+  if(rem===0) return String(w);
+  const g=gcd(rem,d)||1;
+  return (w? w+" ":"")+(rem/g)+"/"+(d/g);
+}
+function fmtResult(r){
+  const neg=r.n<0; const n=Math.abs(r.n), d=r.d;
+  let main;
+  if([1,2,4,8,16,32,64].includes(d)) main=mixedStr(n,d)+"″";
+  else{
+    const t=Math.round(n/d*64), err=n/d-t/64;
+    main="≈ "+mixedStr(t,64)+"″"+(Math.abs(err)>5e-4? " ("+(err>0?"+":"−")+Math.abs(err).toFixed(3)+")":"");
+  }
+  return (neg?"−":"")+main;
+}
+function fmtAlt(r){
+  const dec=r.n/r.d;
+  let s=dec.toFixed(4).replace(/(\.\d*?)0+$/,"$1").replace(/\.$/,"")+" in · "+(dec*25.4).toFixed(2)+" mm";
+  const a=Math.abs(dec);
+  if(a>=12){
+    const ft=Math.floor(a/12), rest=a-ft*12;
+    s+=" · "+(dec<0?"−":"")+ft+"′ "+fmtInFrac(rest)+"″";
+  }
+  return s;
+}
+
+let expr="", ans=null, justEq=false;
+const calcExpr=$("calcExpr"), calcRes=$("calcRes"), calcAlt=$("calcAlt");
+function renderCalc(){
+  calcExpr.innerHTML="";
+  calcExpr.appendChild(document.createTextNode(expr));
+  const cur=document.createElement("span"); cur.className="cur"; calcExpr.appendChild(cur);
+  if(expr==="" ){ calcRes.textContent=""; calcAlt.textContent=""; return; }
+  try{
+    const v=parseExpr(tokenize(expr));
+    calcRes.textContent=fmtResult(v);
+    calcAlt.textContent=fmtAlt(v);
+    calcRes.style.opacity=justEq?1:.65;
+  }catch(e){
+    if(!justEq){ calcRes.textContent=""; calcAlt.textContent=""; }
+  }
+}
+function press(k){
+  if(k==="C"){ expr=""; justEq=false; renderCalc(); return; }
+  if(k==="B"){
+    if(justEq){ expr=""; justEq=false; }
+    else expr=expr.slice(0,-1);
+    renderCalc(); return; }
+  if(k==="="){
+    try{ ans=parseExpr(tokenize(expr)); justEq=true; renderCalc(); }
+    catch(e){ toast(e==="div0"?"Division by zero":"Incomplete expression"); }
+    return;
+  }
+  if(k==="A"){
+    if(!ans) return;
+    const s=(ans.n<0?"−":"")+mixedStr(Math.abs(ans.n),ans.d);
+    if(justEq){ expr=""; justEq=false; }
+    expr+=s; renderCalc(); return;
+  }
+  if(justEq){
+    if("+−×÷".includes(k)){ expr=(ans.n<0?"−":"")+mixedStr(Math.abs(ans.n),ans.d)+k; }
+    else expr=k==="mm"?"":k;
+    justEq=false; renderCalc(); return;
+  }
+  expr+=k; renderCalc();
+}
+document.querySelectorAll(".key").forEach(b=>b.addEventListener("click",()=>press(b.dataset.k)));
+const chipsBox=$("fracChips");
+["1/16","1/8","3/16","1/4","5/16","3/8","7/16","1/2","9/16","5/8","11/16","3/4","13/16","7/8","15/16"].forEach(f=>{
+  const b=document.createElement("button"); b.className="chip"; b.textContent=f;
+  b.addEventListener("click",()=>{
+    if(justEq){ expr=""; justEq=false; }
+    const last=expr[expr.length-1];
+    if(last>="0"&&last<="9") expr+=" ";
+    expr+=f; renderCalc();
+  });
+  chipsBox.appendChild(b);
+});
+renderCalc();
+
+$("miterIn").addEventListener("input",()=>{
+  const a=parseFloat($("miterIn").value);
+  $("miterOut").textContent=(a>0&&a<180)? ((180-a)/2).toFixed(1)+"°" : "—";
+});
+
+/* ============================= DATA TABLES ============================= */
+const numDrill=[.2280,.2210,.2130,.2090,.2055,.2040,.2010,.1990,.1960,.1935,.1910,.1890,.1850,.1820,.1800,
+  .1770,.1730,.1695,.1660,.1610,.1590,.1570,.1540,.1520,.1495,.1470,.1440,.1405,.1360,.1285,
+  .1200,.1160,.1130,.1110,.1100,.1065,.1040,.1015,.0995,.0980,.0960,.0935,.0890,.0860,.0820,
+  .0810,.0785,.0760,.0730,.0700,.0670,.0635,.0595,.0550,.0520,.0465,.0430,.0420,.0410,.0400];
+const letterDrill={A:.234,B:.238,C:.242,D:.246,E:.250,F:.257,G:.261,H:.266,I:.272,J:.277,K:.281,L:.290,
+  M:.295,N:.302,O:.316,P:.323,Q:.332,R:.339,S:.348,T:.358,U:.368,V:.377,W:.386,X:.397,Y:.404,Z:.413};
+const taps=[["#2-56","#50",.0700],["#4-40","#43",.0890],["#6-32","#36",.1065],["#8-32","#29",.1360],
+  ["#10-24","#25",.1495],["#10-32","#21",.1590],["#12-24","#16",.1770],
+  ["1/4-20","#7",.2010],["1/4-28","#3",.2130],["5/16-18","F",.2570],["5/16-24","I",.2720],
+  ["3/8-16","5/16",.3125],["3/8-24","Q",.3320],["7/16-14","U",.3680],["7/16-20","25/64",.3906],
+  ["1/2-13","27/64",.4219],["1/2-20","29/64",.4531],["9/16-12","31/64",.4844],["9/16-18","33/64",.5156],
+  ["5/8-11","17/32",.5312],["5/8-18","37/64",.5781],["3/4-10","21/32",.6562],["3/4-16","11/16",.6875]];
+const metricTaps=[["M3 × 0.5",2.5],["M4 × 0.7",3.3],["M5 × 0.8",4.2],["M6 × 1.0",5.0],
+  ["M8 × 1.25",6.8],["M10 × 1.5",8.5],["M12 × 1.75",10.2],["M14 × 2.0",12.0],["M16 × 2.0",14.0]];
+
+function buildTables(){
+  let h="<tr><th>Thread</th><th>Tap drill</th><th class='num'>in</th><th class='num'>mm</th></tr>";
+  taps.forEach(t=>h+="<tr><td>"+t[0]+"</td><td>"+t[1]+"</td><td class='num'>"+t[2].toFixed(4)+
+    "</td><td class='num'>"+(t[2]*25.4).toFixed(2)+"</td></tr>");
+  metricTaps.forEach(t=>h+="<tr><td>"+t[0]+"</td><td>"+t[1].toFixed(1)+" mm</td><td class='num'>"+
+    (t[1]/25.4).toFixed(4)+"</td><td class='num'>"+t[1].toFixed(2)+"</td></tr>");
+  $("tblTap").innerHTML=h;
+
+  h="<tr><th>Fraction</th><th class='num'>in</th><th class='num'>mm</th></tr>";
+  for(let i=1;i<=64;i++){
+    const g=gcd(i,64), n=i/g, d=64/g;
+    h+="<tr><td>"+(d===1?"1":n+"/"+d)+"</td><td class='num'>"+(i/64).toFixed(4)+
+       "</td><td class='num'>"+(i/64*25.4).toFixed(2)+"</td></tr>";
+  }
+  $("tblFrac").innerHTML=h;
+
+  h="<tr><th>Drill</th><th class='num'>in</th><th class='num'>mm</th></tr>";
+  numDrill.forEach((v,i)=>h+="<tr><td>#"+(i+1)+"</td><td class='num'>"+v.toFixed(4)+
+    "</td><td class='num'>"+(v*25.4).toFixed(2)+"</td></tr>");
+  Object.keys(letterDrill).forEach(k=>h+="<tr><td>"+k+"</td><td class='num'>"+letterDrill[k].toFixed(3)+
+    "</td><td class='num'>"+(letterDrill[k]*25.4).toFixed(2)+"</td></tr>");
+  $("tblDrill").innerHTML=h;
+}
+buildTables();
+$("dataSearch").addEventListener("input",()=>{
+  const q=$("dataSearch").value.trim().toLowerCase();
+  document.querySelectorAll("#view-data details").forEach(det=>{
+    let any=false;
+    det.querySelectorAll("tr").forEach(tr=>{
+      if(tr.querySelector("th")) return;
+      const hit=!q||tr.textContent.toLowerCase().includes(q);
+      tr.style.display=hit?"":"none";
+      if(hit) any=true;
+    });
+    if(q){ det.open=any; }
+  });
+});
+
+/* ============================= BOOT ============================= */
+function startSensors(){
+  window.addEventListener("devicemotion", onMotion);
+  setTimeout(()=>{
+    if(!gotData) $("sensorMsg").textContent=
+      "No motion sensor detected. Open this page in Chrome on your phone to use the level — the other tabs work anywhere.";
+  },2500);
+}
+if(typeof DeviceMotionEvent!=="undefined" && typeof DeviceMotionEvent.requestPermission==="function"){
+  $("permOverlay").hidden=false;
+  $("permBtn").addEventListener("click",()=>{
+    DeviceMotionEvent.requestPermission().then(r=>{
+      $("permOverlay").hidden=true;
+      if(r==="granted") startSensors();
+      else $("sensorMsg").textContent="Motion sensor permission denied.";
+    }).catch(()=>{ $("permOverlay").hidden=true; startSensors(); });
+  });
+}else{
+  startSensors();
+}
+sizeVial();
+requestAnimationFrame(loop);
+window.addEventListener("orientationchange",()=>{ setTimeout(()=>{ sizeVial(); sizeRuler(); },250); });
+</script>
