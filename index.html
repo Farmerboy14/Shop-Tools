@@ -12,23 +12,23 @@
 <style>
   :root{
     --bg:#eef0ec; --panel:#ffffff; --panel2:#f4f5f1; --ink:#191c1f; --muted:#5f666d;
-    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e;
+    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e; --zebra:rgba(25,28,31,.035);
     --mono:ui-monospace,"Roboto Mono","Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
     --sans:system-ui,"Roboto","Segoe UI",sans-serif;
   }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#131518; --panel:#1c1f23; --panel2:#22262b; --ink:#e7eaed; --muted:#8f969e;
-      --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e;
+      --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e; --zebra:rgba(231,234,237,.04);
     }
   }
   :root[data-theme="dark"]{
     --bg:#131518; --panel:#1c1f23; --panel2:#22262b; --ink:#e7eaed; --muted:#8f969e;
-    --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e;
+    --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e; --zebra:rgba(231,234,237,.04);
   }
   :root[data-theme="light"]{
     --bg:#eef0ec; --panel:#ffffff; --panel2:#f4f5f1; --ink:#191c1f; --muted:#5f666d;
-    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e;
+    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e; --zebra:rgba(25,28,31,.035);
   }
   html,body{height:100%; margin:0; padding:0;}
   body{background:var(--bg); color:var(--ink); font-family:var(--sans); overscroll-behavior:none;
@@ -113,9 +113,27 @@
   .miter b{font:600 20px/1 var(--mono); color:var(--accent);}
 
   /* ---------- DATA ---------- */
+  .data-head{position:sticky; top:0; z-index:5; background:var(--bg);
+             margin:-12px -14px 10px; padding:12px 14px 10px;}
   #dataSearch{font:500 17px/1 var(--sans); width:100%; padding:13px 14px; border:1.5px solid var(--line);
-              border-radius:6px; background:var(--panel); color:var(--ink); margin-bottom:10px;}
+              border-radius:6px; background:var(--panel); color:var(--ink);}
   #dataSearch:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  .sec-hint{font-size:12.5px; color:var(--muted); padding:0 14px 10px; line-height:1.4;}
+  td.star{width:34px; text-align:center; color:var(--muted); padding-left:8px; padding-right:0;
+          cursor:pointer; -webkit-user-select:none; user-select:none; font-size:15px;}
+  tr.pinned td.star{color:var(--accent);}
+  tbody tr:nth-child(even) td{background:var(--zebra);}
+  .tool-card{padding:0 14px 14px; display:flex; flex-direction:column; gap:10px;}
+  .tool-card input{font:500 17px/1 var(--mono); width:100%; padding:12px; border:1.5px solid var(--line);
+                   border-radius:6px; background:var(--panel2); color:var(--ink);}
+  .tool-card input:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  .fld{display:flex; flex-direction:column; gap:6px; flex:1; min-width:0;}
+  .rpm-row{display:flex; gap:10px;}
+  .rpm-out{display:flex; align-items:baseline; gap:12px; padding-top:2px;}
+  .rpm-out b{font:600 34px/1 var(--mono); font-variant-numeric:tabular-nums; color:var(--accent);}
+  .chip.on{border-color:var(--accent); color:var(--accent);}
+  .src-tag{font:600 10px/1 var(--sans); letter-spacing:.08em; color:var(--muted);
+           border:1px solid var(--line); border-radius:4px; padding:3px 5px; white-space:nowrap;}
   details{border:1.5px solid var(--line); border-radius:6px; background:var(--panel); margin-bottom:10px; overflow:hidden;}
   summary{font:700 13px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; padding:14px;
           cursor:pointer; color:var(--ink); list-style:none; display:flex; justify-content:space-between;}
@@ -261,11 +279,47 @@
 
     <!-- ============ DATA ============ -->
     <section class="view" id="view-data">
-      <div class="badges" style="margin-bottom:10px"><span class="lbl">Reference Data</span></div>
-      <input id="dataSearch" type="search" placeholder="Search — e.g. 1/4-20, M8, #29, 0.257" autocomplete="off">
+      <div class="data-head">
+        <input id="dataSearch" type="search" placeholder="Search — 1/4-20, M8, #29, 16 ga, 0.257" autocomplete="off">
+      </div>
+      <details open id="secPin" hidden>
+        <summary>Pinned</summary>
+        <div class="tblwrap"><table id="tblPin"></table></div>
+      </details>
+      <details id="secFind">
+        <summary>Nearest drill</summary>
+        <div class="tool-card">
+          <input id="findIn" type="text" placeholder="Target size — .266, 17/64 or 6.7mm" autocomplete="off">
+          <div class="tblwrap"><table id="tblFind"></table></div>
+        </div>
+      </details>
+      <details id="secRpm">
+        <summary>Drill RPM</summary>
+        <div class="tool-card">
+          <div class="rpm-row">
+            <label class="fld"><span class="lbl">Drill size</span>
+              <input id="rpmDia" type="text" placeholder="1/4, .201, 6.8mm" autocomplete="off"></label>
+            <label class="fld"><span class="lbl">SFM</span>
+              <input id="rpmSfm" type="number" inputmode="numeric" value="90" min="1"></label>
+          </div>
+          <div class="chips" id="sfmChips"></div>
+          <div class="rpm-out"><span class="lbl">Speed</span><b id="rpmOut">—</b></div>
+          <p class="sec-hint" style="padding:0">RPM = SFM × 3.82 ÷ ⌀. Speeds are for HSS bits; carbide runs 2–3×.</p>
+        </div>
+      </details>
       <details open id="secTap">
-        <summary>Tap drill sizes</summary>
+        <summary>Tap drills</summary>
+        <p class="sec-hint">Tap ☆ on any row to keep it in Pinned.</p>
         <div class="tblwrap"><table id="tblTap"></table></div>
+      </details>
+      <details id="secClr">
+        <summary>Clearance holes</summary>
+        <div class="tblwrap"><table id="tblClr"></table></div>
+      </details>
+      <details id="secPipe">
+        <summary>Pipe taps (NPT)</summary>
+        <p class="sec-hint">Straight-drilled, no taper reamer.</p>
+        <div class="tblwrap"><table id="tblPipe"></table></div>
       </details>
       <details id="secFrac">
         <summary>Fraction · decimal · mm</summary>
@@ -274,6 +328,14 @@
       <details id="secDrill">
         <summary>Number &amp; letter drills</summary>
         <div class="tblwrap"><table id="tblDrill"></table></div>
+      </details>
+      <details id="secGa">
+        <summary>Sheet metal gauges</summary>
+        <div class="tblwrap"><table id="tblGa"></table></div>
+      </details>
+      <details id="secHex">
+        <summary>Hex keys &amp; wrenches</summary>
+        <div class="tblwrap"><table id="tblHex"></table></div>
       </details>
     </section>
   </main>
@@ -937,45 +999,152 @@ const taps=[["#2-56","#50",.0700],["#4-40","#43",.0890],["#6-32","#36",.1065],["
   ["1/2-13","27/64",.4219],["1/2-20","29/64",.4531],["9/16-12","31/64",.4844],["9/16-18","33/64",.5156],
   ["5/8-11","17/32",.5312],["5/8-18","37/64",.5781],["3/4-10","21/32",.6562],["3/4-16","11/16",.6875]];
 const metricTaps=[["M3 × 0.5",2.5],["M4 × 0.7",3.3],["M5 × 0.8",4.2],["M6 × 1.0",5.0],
-  ["M8 × 1.25",6.8],["M10 × 1.5",8.5],["M12 × 1.75",10.2],["M14 × 2.0",12.0],["M16 × 2.0",14.0]];
+  ["M8 × 1.25",6.8],["M8 × 1.0 fine",7.0],["M10 × 1.5",8.5],["M10 × 1.25 fine",8.8],
+  ["M12 × 1.75",10.2],["M12 × 1.5 fine",10.5],["M14 × 2.0",12.0],["M16 × 2.0",14.0]];
+const clrImp=[["#4","#32",.1160,"#30",.1285],["#6","#27",.1440,"#25",.1495],["#8","#18",.1695,"#16",.1770],
+  ["#10","#9",.1960,"#7",.2010],["1/4","F",.2570,"H",.2660],["5/16","P",.3230,"Q",.3320],
+  ["3/8","W",.3860,"X",.3970],["7/16","29/64",.4531,"15/32",.4688],["1/2","33/64",.5156,"17/32",.5312],
+  ["5/8","41/64",.6406,"21/32",.6562],["3/4","49/64",.7656,"25/32",.7812]];
+const clrMet=[["M3",3.2,3.4],["M4",4.3,4.5],["M5",5.3,5.5],["M6",6.4,6.6],["M8",8.4,9.0],
+  ["M10",10.5,11.0],["M12",13.0,13.5],["M14",15.0,15.5],["M16",17.0,17.5],["M20",21.0,22.0]];
+const npt=[["1/16-27","D",.2460],["1/8-27","R",.3390],["1/4-18","7/16",.4375],["3/8-18","37/64",.5781],
+  ["1/2-14","23/32",.7188],["3/4-14","59/64",.9219],["1-11 1/2","1 5/32",1.1563]];
+const gauges=[[7,.1793,.1875,.1443],[8,.1644,.1719,.1285],[9,.1495,.1563,.1144],[10,.1345,.1406,.1019],
+  [11,.1196,.1250,.0907],[12,.1046,.1094,.0808],[13,.0897,.0938,.0720],[14,.0747,.0781,.0641],
+  [16,.0598,.0625,.0508],[18,.0478,.0500,.0403],[20,.0359,.0375,.0320],[22,.0299,.0312,.0253],
+  [24,.0239,.0250,.0201],[26,.0179,.0188,.0159]];
+const hexes=[["#4","3/32","—"],["#6","7/64","—"],["#8","9/64","—"],["#10","5/32","—"],
+  ["1/4","3/16","7/16"],["5/16","1/4","1/2"],["3/8","5/16","9/16"],["7/16","3/8","5/8"],
+  ["1/2","3/8","3/4"],["9/16","—","13/16"],["5/8","1/2","15/16"],["3/4","5/8","1 1/8"],
+  ["7/8","—","1 5/16"],["1","3/4","1 1/2"],
+  ["M3","2.5","5.5"],["M4","3","7"],["M5","4","8"],["M6","5","10"],["M8","6","13"],
+  ["M10","8","16 (17)"],["M12","10","18 (19)"],["M14","12","21 (22)"],["M16","14","24"],["M20","17","30"]];
+
+const rowReg=new Map();                       // key -> {src,label}
+let pins=new Set(store.get("pins",[]));
+function starTd(key){ return "<td class='star' data-key="+JSON.stringify(key)+">"+(pins.has(key)?"★":"☆")+"</td>"; }
+function row(key,src,cells,alt){
+  rowReg.set(key,{src,label:cells.filter(c=>c!=="").join(" · ")});
+  return "<tr"+(pins.has(key)?" class='pinned'":"")+" data-alt="+JSON.stringify(alt||"")+">"+starTd(key)+
+    cells.map((c,i)=>"<td"+(i>0?" class='num'":"")+">"+c+"</td>").join("")+"</tr>";
+}
+function head(cols){ return "<tr><th></th>"+cols.map((c,i)=>"<th"+(i>0?" class='num'":"")+">"+c+"</th>").join("")+"</tr>"; }
 
 function buildTables(){
-  let h="<tr><th>Thread</th><th>Tap drill</th><th class='num'>in</th><th class='num'>mm</th></tr>";
-  taps.forEach(t=>h+="<tr><td>"+t[0]+"</td><td>"+t[1]+"</td><td class='num'>"+t[2].toFixed(4)+
-    "</td><td class='num'>"+(t[2]*25.4).toFixed(2)+"</td></tr>");
-  metricTaps.forEach(t=>h+="<tr><td>"+t[0]+"</td><td>"+t[1].toFixed(1)+" mm</td><td class='num'>"+
-    (t[1]/25.4).toFixed(4)+"</td><td class='num'>"+t[1].toFixed(2)+"</td></tr>");
+  let h=head(["Thread","Tap","in","mm"]);
+  taps.forEach(t=>h+=row("tap|"+t[0],"TAP",[t[0],t[1],t[2].toFixed(4),(t[2]*25.4).toFixed(2)],"tap unc unf"));
+  metricTaps.forEach(t=>h+=row("tap|"+t[0],"TAP",[t[0],t[1].toFixed(1)+" mm",(t[1]/25.4).toFixed(4),t[1].toFixed(2)],"tap metric"));
   $("tblTap").innerHTML=h;
 
-  h="<tr><th>Fraction</th><th class='num'>in</th><th class='num'>mm</th></tr>";
+  h=head(["Bolt","Close","in","Free","in"]);
+  clrImp.forEach(t=>h+=row("clr|"+t[0],"CLEAR",[t[0],t[1],t[2].toFixed(4),t[3],t[4].toFixed(4)],"clearance bolt"));
+  clrMet.forEach(t=>h+=row("clr|"+t[0],"CLEAR",[t[0],t[1].toFixed(1)+" mm",(t[1]/25.4).toFixed(4),
+    t[2].toFixed(1)+" mm",(t[2]/25.4).toFixed(4)],"clearance bolt metric"));
+  $("tblClr").innerHTML=h;
+
+  h=head(["NPT","Drill","in","mm"]);
+  npt.forEach(t=>h+=row("npt|"+t[0],"NPT",[t[0],t[1],t[2].toFixed(4),(t[2]*25.4).toFixed(2)],"npt pipe tap"));
+  $("tblPipe").innerHTML=h;
+
+  h=head(["Fraction","in","mm"]);
   for(let i=1;i<=64;i++){
-    const g=gcd(i,64), n=i/g, d=64/g;
-    h+="<tr><td>"+(d===1?"1":n+"/"+d)+"</td><td class='num'>"+(i/64).toFixed(4)+
-       "</td><td class='num'>"+(i/64*25.4).toFixed(2)+"</td></tr>";
+    const g=gcd(i,64), fr=(64/g===1)?"1":(i/g)+"/"+(64/g);
+    h+=row("frac|"+fr,"FRAC",[fr,(i/64).toFixed(4),(i/64*25.4).toFixed(2)],"fraction");
   }
   $("tblFrac").innerHTML=h;
 
-  h="<tr><th>Drill</th><th class='num'>in</th><th class='num'>mm</th></tr>";
-  numDrill.forEach((v,i)=>h+="<tr><td>#"+(i+1)+"</td><td class='num'>"+v.toFixed(4)+
-    "</td><td class='num'>"+(v*25.4).toFixed(2)+"</td></tr>");
-  Object.keys(letterDrill).forEach(k=>h+="<tr><td>"+k+"</td><td class='num'>"+letterDrill[k].toFixed(3)+
-    "</td><td class='num'>"+(letterDrill[k]*25.4).toFixed(2)+"</td></tr>");
+  h=head(["Drill","in","mm"]);
+  numDrill.forEach((v,i)=>h+=row("drl|#"+(i+1),"DRILL",["#"+(i+1),v.toFixed(4),(v*25.4).toFixed(2)],"number drill wire"));
+  Object.keys(letterDrill).forEach(k=>h+=row("drl|"+k,"DRILL",[k,letterDrill[k].toFixed(3),(letterDrill[k]*25.4).toFixed(2)],"letter drill"));
   $("tblDrill").innerHTML=h;
+
+  h=head(["Ga","Steel","Stainless","Aluminum"]);
+  gauges.forEach(t=>h+=row("ga|"+t[0],"GAUGE",[t[0]+" ga",t[1].toFixed(4),t[2].toFixed(4),t[3].toFixed(4)],"ga gauge sheet"));
+  $("tblGa").innerHTML=h;
+
+  h=head(["Size","Hex key","Wrench"]);
+  hexes.forEach(t=>h+=row("hex|"+t[0],"HEX",[t[0],t[1],t[2]],"hex allen key wrench socket"));
+  $("tblHex").innerHTML=h;
+
+  renderPins();
 }
+function renderPins(){
+  const live=[...pins].filter(k=>rowReg.has(k));
+  $("secPin").hidden = live.length===0;
+  let h=head(["","Entry"]);
+  live.forEach(k=>{ const r=rowReg.get(k);
+    h+="<tr class='pinned'>"+starTd(k)+"<td><span class='src-tag'>"+r.src+"</span></td><td>"+r.label+"</td></tr>"; });
+  $("tblPin").innerHTML=h;
+}
+document.getElementById("view-data").addEventListener("click",e=>{
+  const st=e.target.closest("td.star"); if(!st) return;
+  const key=st.dataset.key;
+  if(pins.has(key)) pins.delete(key); else pins.add(key);
+  store.set("pins",[...pins]);
+  buildTables();
+  applySearch();
+});
 buildTables();
-$("dataSearch").addEventListener("input",()=>{
+
+/* ---- search ---- */
+const SEC_DEFAULT={secPin:true,secFind:false,secRpm:false,secTap:true,secClr:false,secPipe:false,
+                   secFrac:false,secDrill:false,secGa:false,secHex:false};
+function applySearch(){
   const q=$("dataSearch").value.trim().toLowerCase();
   document.querySelectorAll("#view-data details").forEach(det=>{
+    if(det.id==="secFind"||det.id==="secRpm"){ if(q) det.open=false; return; }
     let any=false;
     det.querySelectorAll("tr").forEach(tr=>{
       if(tr.querySelector("th")) return;
-      const hit=!q||tr.textContent.toLowerCase().includes(q);
+      const hit=!q||(tr.textContent+" "+(tr.dataset.alt||"")).toLowerCase().includes(q);
       tr.style.display=hit?"":"none";
       if(hit) any=true;
     });
-    if(q){ det.open=any; }
+    det.open = q? any : SEC_DEFAULT[det.id];
   });
+}
+$("dataSearch").addEventListener("input",applySearch);
+
+/* ---- nearest drill ---- */
+const cands=[];
+numDrill.forEach((v,i)=>cands.push({name:"#"+(i+1),din:v}));
+Object.keys(letterDrill).forEach(k=>cands.push({name:k,din:letterDrill[k]}));
+for(let i=1;i<=64;i++){ const g=gcd(i,64);
+  cands.push({name:((64/g===1)?"1":(i/g)+"/"+(64/g))+"″",din:i/64}); }
+for(let m=5;m<=130;m++) cands.push({name:(m/10).toFixed(1)+" mm",din:(m/10)/25.4});
+function parseSize(s){
+  try{ const v=parseExpr(tokenize(s.trim())); const d=v.n/v.d; return d>0?d:null; }catch(e){ return null; }
+}
+$("findIn").addEventListener("input",()=>{
+  const t=parseSize($("findIn").value);
+  if(!t){ $("tblFind").innerHTML=""; return; }
+  const best=[...cands].sort((a,b)=>Math.abs(a.din-t)-Math.abs(b.din-t)).slice(0,5);
+  let h=head(["Drill","in","mm","off by"]);
+  best.forEach(c=>{ const d=c.din-t;
+    h+="<tr><td class='star'></td><td>"+c.name+"</td><td class='num'>"+c.din.toFixed(4)+
+       "</td><td class='num'>"+(c.din*25.4).toFixed(2)+"</td><td class='num'>"+
+       (Math.abs(d)<5e-5?"exact":(d>0?"+":"−")+Math.abs(d).toFixed(4))+"</td></tr>"; });
+  $("tblFind").innerHTML=h;
 });
+
+/* ---- drill rpm ---- */
+const SFM=[["Aluminum",250],["Brass",150],["Mild steel",90],["Cast iron",80],["Stainless",40]];
+const sfmBox=$("sfmChips");
+SFM.forEach(([n,v])=>{
+  const b=document.createElement("button"); b.className="chip"; b.textContent=n+" "+v;
+  b.addEventListener("click",()=>{ $("rpmSfm").value=v;
+    sfmBox.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c===b)); calcRpm(); });
+  sfmBox.appendChild(b);
+});
+function calcRpm(){
+  const d=parseSize($("rpmDia").value), s=parseFloat($("rpmSfm").value);
+  if(!d||!s||s<=0){ $("rpmOut").textContent="—"; return; }
+  let r=s*3.82/d;
+  r=r>1000?Math.round(r/10)*10:Math.round(r/5)*5;
+  $("rpmOut").textContent=r.toLocaleString()+" rpm";
+}
+$("rpmDia").addEventListener("input",calcRpm);
+$("rpmSfm").addEventListener("input",()=>{ sfmBox.querySelectorAll(".chip").forEach(c=>c.classList.remove("on")); calcRpm(); });
 
 /* ============================= BOOT ============================= */
 function startSensors(){
