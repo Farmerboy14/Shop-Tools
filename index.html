@@ -119,8 +119,10 @@
               border-radius:6px; background:var(--panel); color:var(--ink);}
   #dataSearch:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
   .sec-hint{font-size:12.5px; color:var(--muted); padding:0 14px 10px; line-height:1.4;}
-  td.star{width:34px; text-align:center; color:var(--muted); padding-left:8px; padding-right:0;
-          cursor:pointer; -webkit-user-select:none; user-select:none; font-size:15px;}
+  td.star{width:44px; text-align:center; color:var(--muted); padding-left:6px; padding-right:0;
+          cursor:pointer; -webkit-user-select:none; user-select:none; font-size:18px;}
+  #view-data details{scroll-margin-top:118px;}
+  .data-head .chips{padding:10px 0 0;}
   tr.pinned td.star{color:var(--accent);}
   tbody tr:nth-child(even) td{background:var(--zebra);}
   .tool-card{padding:0 14px 14px; display:flex; flex-direction:column; gap:10px;}
@@ -135,17 +137,22 @@
   .src-tag{font:600 10px/1 var(--sans); letter-spacing:.08em; color:var(--muted);
            border:1px solid var(--line); border-radius:4px; padding:3px 5px; white-space:nowrap;}
   details{border:1.5px solid var(--line); border-radius:6px; background:var(--panel); margin-bottom:10px; overflow:hidden;}
-  summary{font:700 13px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; padding:14px;
+  summary{font:700 13px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; padding:17px 14px;
           cursor:pointer; color:var(--ink); list-style:none; display:flex; justify-content:space-between;}
   summary::after{content:"+"; color:var(--muted); font:600 16px/1 var(--mono);}
   details[open] summary::after{content:"−";}
   summary:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
   .tblwrap{overflow-x:auto;}
-  table{width:100%; border-collapse:collapse; font:400 14.5px/1.35 var(--mono); font-variant-numeric:tabular-nums;}
+  table{width:100%; border-collapse:collapse; font:400 15px/1.35 var(--mono); font-variant-numeric:tabular-nums;}
   th{font:600 11px/1 var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
-     text-align:left; padding:6px 14px; border-top:1px solid var(--line);}
-  td{padding:7px 14px; border-top:1px solid var(--line);}
+     text-align:left; padding:7px 10px; border-top:1px solid var(--line);}
+  td{padding:12px 10px; border-top:1px solid var(--line);}
   td.num{text-align:right;}  th.num{text-align:right;}
+  td small{display:block; font:400 12px/1.2 var(--mono); color:var(--muted); margin-top:3px;}
+  @media (max-width:430px){
+    table{font-size:14px;}
+    td,th{padding-left:7px; padding-right:7px;}
+  }
 
   /* ---------- TABBAR ---------- */
   #tabbar{display:grid; grid-template-columns:repeat(4,1fr); border-top:1.5px solid var(--line);
@@ -281,6 +288,7 @@
     <section class="view" id="view-data">
       <div class="data-head">
         <input id="dataSearch" type="search" placeholder="Search — 1/4-20, M8, #29, 16 ga, 0.257" autocomplete="off">
+        <div class="chips" id="secChips"></div>
       </div>
       <details open id="secPin" hidden>
         <summary>Pinned</summary>
@@ -1023,27 +1031,35 @@ const hexes=[["#4","3/32","—"],["#6","7/64","—"],["#8","9/64","—"],["#10",
 const rowReg=new Map();                       // key -> {src,label}
 let pins=new Set(store.get("pins",[]));
 function starTd(key){ return "<td class='star' data-key="+JSON.stringify(key)+">"+(pins.has(key)?"★":"☆")+"</td>"; }
+const two=(a,b)=>a+"<small>"+b+"</small>";
 function row(key,src,cells,alt){
-  rowReg.set(key,{src,label:cells.filter(c=>c!=="").join(" · ")});
+  const plain=cells.map(c=>String(c).replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim())
+                   .filter(c=>c!=="").join(" · ");
+  rowReg.set(key,{src,label:plain});
   return "<tr"+(pins.has(key)?" class='pinned'":"")+" data-alt="+JSON.stringify(alt||"")+">"+starTd(key)+
     cells.map((c,i)=>"<td"+(i>0?" class='num'":"")+">"+c+"</td>").join("")+"</tr>";
 }
 function head(cols){ return "<tr><th></th>"+cols.map((c,i)=>"<th"+(i>0?" class='num'":"")+">"+c+"</th>").join("")+"</tr>"; }
 
 function buildTables(){
-  let h=head(["Thread","Tap","in","mm"]);
-  taps.forEach(t=>h+=row("tap|"+t[0],"TAP",[t[0],t[1],t[2].toFixed(4),(t[2]*25.4).toFixed(2)],"tap unc unf"));
-  metricTaps.forEach(t=>h+=row("tap|"+t[0],"TAP",[t[0],t[1].toFixed(1)+" mm",(t[1]/25.4).toFixed(4),t[1].toFixed(2)],"tap metric"));
+  let h=head(["Thread","Tap","Size"]);
+  taps.forEach(t=>h+=row("tap|"+t[0],"TAP",[t[0],t[1],
+    two(t[2].toFixed(4),(t[2]*25.4).toFixed(2)+" mm")],"tap unc unf"));
+  metricTaps.forEach(t=>h+=row("tap|"+t[0],"TAP",[t[0],t[1].toFixed(1)+" mm",
+    two((t[1]/25.4).toFixed(4),t[1].toFixed(2)+" mm")],"tap metric"));
   $("tblTap").innerHTML=h;
 
-  h=head(["Bolt","Close","in","Free","in"]);
-  clrImp.forEach(t=>h+=row("clr|"+t[0],"CLEAR",[t[0],t[1],t[2].toFixed(4),t[3],t[4].toFixed(4)],"clearance bolt"));
-  clrMet.forEach(t=>h+=row("clr|"+t[0],"CLEAR",[t[0],t[1].toFixed(1)+" mm",(t[1]/25.4).toFixed(4),
-    t[2].toFixed(1)+" mm",(t[2]/25.4).toFixed(4)],"clearance bolt metric"));
+  h=head(["Bolt","Close","Free"]);
+  clrImp.forEach(t=>h+=row("clr|"+t[0],"CLEAR",[t[0],
+    two(t[1],t[2].toFixed(4)),two(t[3],t[4].toFixed(4))],"clearance bolt"));
+  clrMet.forEach(t=>h+=row("clr|"+t[0],"CLEAR",[t[0],
+    two(t[1].toFixed(1)+" mm",(t[1]/25.4).toFixed(4)),
+    two(t[2].toFixed(1)+" mm",(t[2]/25.4).toFixed(4))],"clearance bolt metric"));
   $("tblClr").innerHTML=h;
 
-  h=head(["NPT","Drill","in","mm"]);
-  npt.forEach(t=>h+=row("npt|"+t[0],"NPT",[t[0],t[1],t[2].toFixed(4),(t[2]*25.4).toFixed(2)],"npt pipe tap"));
+  h=head(["NPT","Drill","Size"]);
+  npt.forEach(t=>h+=row("npt|"+t[0],"NPT",[t[0],t[1],
+    two(t[2].toFixed(4),(t[2]*25.4).toFixed(2)+" mm")],"npt pipe tap"));
   $("tblPipe").innerHTML=h;
 
   h=head(["Fraction","in","mm"]);
@@ -1119,12 +1135,26 @@ $("findIn").addEventListener("input",()=>{
   const t=parseSize($("findIn").value);
   if(!t){ $("tblFind").innerHTML=""; return; }
   const best=[...cands].sort((a,b)=>Math.abs(a.din-t)-Math.abs(b.din-t)).slice(0,5);
-  let h=head(["Drill","in","mm","off by"]);
+  let h="<tr><th>Drill</th><th class='num'>Size</th><th class='num'>off by</th></tr>";
   best.forEach(c=>{ const d=c.din-t;
-    h+="<tr><td class='star'></td><td>"+c.name+"</td><td class='num'>"+c.din.toFixed(4)+
-       "</td><td class='num'>"+(c.din*25.4).toFixed(2)+"</td><td class='num'>"+
+    h+="<tr><td>"+c.name+"</td><td class='num'>"+two(c.din.toFixed(4),(c.din*25.4).toFixed(2)+" mm")+
+       "</td><td class='num'>"+
        (Math.abs(d)<5e-5?"exact":(d>0?"+":"−")+Math.abs(d).toFixed(4))+"</td></tr>"; });
   $("tblFind").innerHTML=h;
+});
+
+/* ---- section jump chips ---- */
+const SECS=[["secTap","Taps"],["secClr","Clearance"],["secPipe","NPT"],["secFrac","Fractions"],
+  ["secDrill","Drills"],["secGa","Gauges"],["secHex","Hex"],["secFind","Nearest"],["secRpm","RPM"]];
+const scBox=$("secChips");
+SECS.forEach(([id,name])=>{
+  const b=document.createElement("button"); b.className="chip"; b.textContent=name;
+  b.addEventListener("click",()=>{
+    const d=$(id); d.open=true;
+    const smooth=matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth";
+    d.scrollIntoView({behavior:smooth,block:"start"});
+  });
+  scBox.appendChild(b);
 });
 
 /* ---- drill rpm ---- */

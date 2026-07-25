@@ -1,4 +1,4 @@
-const CACHE = "shop-level-v2";
+const CACHE = "shop-level-v3";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
