@@ -11,3 +11,7 @@ A precision shop instrument for your phone — installable PWA, works offline.
 2. *Ruler:* CALIBRATE → match the outline to a bank card.
 
 Single-file app (`index.html`) — no build step, no dependencies.
+
+## Silage Loads (`silage-loads.html`)
+
+Tally counter for hauling: one big button per load, shows today / yesterday / job total, per-day history with fix-up +/− buttons, and a **New Job** button that starts a fresh tracker for each field while keeping the old ones. Counts save on the phone (localStorage), works offline once visited.
