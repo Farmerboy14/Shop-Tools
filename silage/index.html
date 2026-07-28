@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Silage Loads</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#131518">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#eef0ec; --panel:#ffffff; --panel2:#f4f5f1; --ink:#191c1f; --muted:#5f666d;
+    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e;
+    --mono:ui-monospace,"Roboto Mono","Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,"Roboto","Segoe UI",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#131518; --panel:#1c1f23; --panel2:#22262b; --ink:#e7eaed; --muted:#8f969e;
+      --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#131518; --panel:#1c1f23; --panel2:#22262b; --ink:#e7eaed; --muted:#8f969e;
+    --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; --good:#34d178; --warn:#ff6b5e;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef0ec; --panel:#ffffff; --panel2:#f4f5f1; --ink:#191c1f; --muted:#5f666d;
+    --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; --good:#15803d; --warn:#b3261e;
+  }
+  html,body{height:100%; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); overscroll-behavior:none;
+       -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+       -webkit-text-size-adjust:100%; text-size-adjust:100%;
+       -webkit-user-select:none; user-select:none;}
+  input{-webkit-user-select:text; user-select:text;}
+  #app{max-width:520px; margin:0 auto; padding:12px 14px calc(20px + env(safe-area-inset-bottom));
+       display:flex; flex-direction:column; gap:12px;}
+
+  header{display:flex; align-items:center; gap:10px;}
+  header h1{font:700 16px/1 var(--sans); letter-spacing:.12em; text-transform:uppercase; margin:0; flex:1;}
+  .hbtn{font:700 12px/1 var(--sans); letter-spacing:.08em; padding:10px 12px; border-radius:6px;
+        border:1.5px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer;}
+  .hbtn:active{transform:translateY(1px); background:var(--panel2);}
+  .hbtn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+
+  .card{border:1.5px solid var(--line); border-radius:8px; background:var(--panel); padding:14px;}
+  .lbl{font:600 11px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--muted);}
+
+  #clockCard{display:flex; align-items:center; gap:12px; padding:12px 14px;}
+  #clockTime{font:600 clamp(40px,13vw,56px)/1 var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+  #clockTime small{font-size:.45em; font-weight:500; color:var(--muted); margin-left:4px;}
+  #clockDate{font:500 13px/1.3 var(--sans); color:var(--muted); margin-top:4px;}
+  #awakeBtn{margin-left:auto; font:700 11px/1.35 var(--sans); letter-spacing:.08em; padding:11px 12px;
+            border-radius:6px; border:1.5px solid var(--line); background:var(--panel); color:var(--muted);
+            cursor:pointer; text-align:center;}
+  #awakeBtn:active{transform:translateY(1px); background:var(--panel2);}
+  #awakeBtn.on{border-color:var(--good); color:var(--good);}
+
+  #jobRow{display:flex; align-items:center; gap:8px;}
+  #jobName{font:700 18px/1.2 var(--sans); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #jobStarted{font:400 12px/1 var(--sans); color:var(--muted);}
+
+  #todayCard{text-align:center; padding:18px 14px 16px;}
+  #todayCount{font:600 clamp(72px,30vw,128px)/1 var(--mono); font-variant-numeric:tabular-nums;
+              letter-spacing:-.02em; margin:6px 0 2px;}
+  #lastLoad{font:400 13px/1 var(--sans); color:var(--muted); min-height:16px;}
+  #bigBtn{width:100%; margin-top:14px; padding:26px 0; border-radius:10px; border:none; cursor:pointer;
+          background:var(--accent); color:var(--accent-ink);
+          font:800 24px/1 var(--sans); letter-spacing:.1em;}
+  #bigBtn:active{transform:translateY(2px); filter:brightness(.92);}
+  #undoBtn{margin-top:10px; width:100%; padding:13px 0; border-radius:8px; cursor:pointer;
+           border:1.5px solid var(--line); background:var(--panel); color:var(--muted);
+           font:700 14px/1 var(--sans); letter-spacing:.08em;}
+  #undoBtn:active{transform:translateY(1px); background:var(--panel2);}
+
+  .statgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .stat{border:1.5px solid var(--line); border-radius:8px; background:var(--panel); padding:12px 14px; text-align:center;}
+  .stat b{font:600 34px/1.2 var(--mono); font-variant-numeric:tabular-nums; display:block; margin-top:4px;}
+
+  #histList{display:flex; flex-direction:column; gap:6px; margin-top:10px;}
+  .hrow{display:flex; align-items:center; gap:8px; padding:10px 12px; border:1.5px solid var(--line);
+        border-radius:6px; background:var(--panel2);}
+  .hrow .d{flex:1; font:500 14px/1.2 var(--sans);}
+  .hrow .d small{display:block; color:var(--muted); font-size:11px; margin-top:2px;}
+  .hrow b{font:600 22px/1 var(--mono); font-variant-numeric:tabular-nums; min-width:44px; text-align:right;}
+  .mini{font:700 18px/1 var(--mono); width:40px; height:40px; border-radius:6px; cursor:pointer;
+        border:1.5px solid var(--line); background:var(--panel); color:var(--ink);}
+  .mini:active{transform:translateY(1px); background:var(--panel2);}
+  .empty{color:var(--muted); font-size:14px; text-align:center; padding:10px 0;}
+
+  /* panels (new job / manage jobs) */
+  .panel{display:none;}
+  .panel.open{display:block;}
+  .panel input[type=text]{width:100%; box-sizing:border-box; font:500 16px/1.3 var(--sans);
+        padding:12px; border-radius:6px; border:1.5px solid var(--line);
+        background:var(--panel2); color:var(--ink); margin-top:8px;}
+  .prow{display:flex; gap:8px; margin-top:10px;}
+  .prow .hbtn{flex:1; padding:13px 0; text-align:center;}
+  .jobitem{display:flex; align-items:center; gap:8px; padding:10px 12px; margin-top:6px;
+           border:1.5px solid var(--line); border-radius:6px; background:var(--panel2); cursor:pointer;}
+  .jobitem.active{border-color:var(--accent);}
+  .jobitem .jn{flex:1; font:600 14px/1.3 var(--sans);}
+  .jobitem .jn small{display:block; font-weight:400; color:var(--muted); font-size:11px; margin-top:2px;}
+  .jobitem .tot{font:600 18px/1 var(--mono); color:var(--muted);}
+  .danger{color:var(--warn); border-color:var(--warn);}
+  footer{text-align:center; color:var(--muted); font-size:11px; letter-spacing:.06em;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Silage Loads</h1>
+    <button class="hbtn" id="jobsBtn" type="button">JOBS</button>
+    <button class="hbtn primary" id="newJobBtn" type="button">+ NEW JOB</button>
+  </header>
+
+  <div class="card panel" id="newJobPanel">
+    <div class="lbl">Start a new job</div>
+    <input type="text" id="newJobName" placeholder="Job name (field, farm, crop…)" maxlength="40">
+    <div class="prow">
+      <button class="hbtn" id="newJobCancel" type="button">CANCEL</button>
+      <button class="hbtn primary" id="newJobStart" type="button">START TRACKING</button>
+    </div>
+  </div>
+
+  <div class="card panel" id="jobsPanel">
+    <div class="lbl">Jobs — tap to switch</div>
+    <div id="jobsList"></div>
+    <div class="lbl" style="margin-top:14px;">Rename current job</div>
+    <input type="text" id="renameInput" maxlength="40">
+    <div class="prow">
+      <button class="hbtn" id="renameBtn" type="button">RENAME</button>
+      <button class="hbtn danger" id="deleteBtn" type="button">DELETE JOB</button>
+    </div>
+  </div>
+
+  <div class="card" id="clockCard">
+    <div>
+      <div id="clockTime">--:--</div>
+      <div id="clockDate"></div>
+    </div>
+    <button id="awakeBtn" type="button">KEEP<br>SCREEN ON</button>
+  </div>
+
+  <div class="card">
+    <div id="jobRow">
+      <div style="flex:1; min-width:0;">
+        <div class="lbl">Current job</div>
+        <div id="jobName"></div>
+      </div>
+      <div id="jobStarted"></div>
+    </div>
+  </div>
+
+  <div class="card" id="todayCard">
+    <div class="lbl" id="todayLbl">Today</div>
+    <div id="todayCount">0</div>
+    <div id="lastLoad"></div>
+    <button id="bigBtn" type="button">+ LOAD HAULED</button>
+    <button id="undoBtn" type="button">− UNDO LAST LOAD</button>
+  </div>
+
+  <div class="statgrid">
+    <div class="stat"><span class="lbl">Yesterday</span><b id="yestCount">0</b></div>
+    <div class="stat"><span class="lbl">Job total</span><b id="jobTotal">0</b></div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">History (this job)</div>
+    <div id="histList"></div>
+  </div>
+
+  <footer>Counts save on this phone automatically</footer>
+</div>
+
+<script>
+"use strict";
+(() => {
+  const KEY = "silage-loads-v1";
+
+  // localStorage with in-memory fallback (private mode etc.)
+  let mem = null;
+  const store = {
+    get(){ try { return localStorage.getItem(KEY); } catch(e){ return mem; } },
+    set(v){ mem = v; try { localStorage.setItem(KEY, v); } catch(e){} }
+  };
+
+  const pad = n => String(n).padStart(2, "0");
+  const dateKey = d => d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+  const todayKey = () => dateKey(new Date());
+  const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate()-1); return dateKey(d); };
+
+  function niceDate(key){
+    const [y,m,d] = key.split("-").map(Number);
+    const dt = new Date(y, m-1, d);
+    return dt.toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
+  }
+
+  function newJob(name){
+    return { id: "j" + Math.random().toString(36).slice(2,9), name, created: todayKey(), days: {} };
+  }
+
+  function load(){
+    const raw = store.get();
+    if (raw){
+      try {
+        const s = JSON.parse(raw);
+        if (s && Array.isArray(s.jobs) && s.jobs.length) return s;
+      } catch(e){}
+    }
+    // First run: seed with 10 loads hauled on Jul 27, 2026.
+    const job = newJob("Job 1");
+    job.created = "2026-07-27";
+    job.days["2026-07-27"] = { count: 10, times: [] };
+    const s = { jobs: [job], active: job.id };
+    store.set(JSON.stringify(s));
+    return s;
+  }
+
+  let state = load();
+  const save = () => store.set(JSON.stringify(state));
+  const activeJob = () => state.jobs.find(j => j.id === state.active) || state.jobs[0];
+  const dayCount = (job, key) => (job.days[key] && job.days[key].count) || 0;
+  const jobTotal = job => Object.values(job.days).reduce((a,d) => a + d.count, 0);
+
+  function bump(job, key, delta, logTime){
+    const day = job.days[key] || (job.days[key] = { count: 0, times: [] });
+    day.count = Math.max(0, day.count + delta);
+    if (delta > 0 && logTime) day.times.push(Date.now());
+    else if (delta < 0 && day.times.length) day.times.pop();
+    if (day.count === 0 && key !== todayKey()) delete job.days[key];
+    save(); render();
+  }
+
+  const $ = id => document.getElementById(id);
+
+  function render(){
+    const job = activeJob();
+    state.active = job.id;
+    const tk = todayKey(), yk = yesterdayKey();
+
+    $("jobName").textContent = job.name;
+    $("jobStarted").textContent = "since " + niceDate(job.created);
+    $("todayLbl").textContent = "Today · " + niceDate(tk);
+    $("todayCount").textContent = dayCount(job, tk);
+    $("yestCount").textContent = dayCount(job, yk);
+    $("jobTotal").textContent = jobTotal(job);
+
+    const times = (job.days[tk] && job.days[tk].times) || [];
+    $("lastLoad").textContent = times.length
+      ? "last load " + new Date(times[times.length-1]).toLocaleTimeString(undefined, {hour:"numeric", minute:"2-digit"})
+      : "";
+
+    // History, newest first. +/− on each row so a missed load can be fixed later.
+    const hist = $("histList");
+    hist.innerHTML = "";
+    const keys = Object.keys(job.days).filter(k => dayCount(job,k) > 0 || k === tk).sort().reverse();
+    if (!keys.length){
+      hist.innerHTML = '<div class="empty">No loads yet — hit the big button.</div>';
+    }
+    for (const k of keys){
+      const row = document.createElement("div");
+      row.className = "hrow";
+      const label = k === tk ? "Today" : (k === yk ? "Yesterday" : "");
+      row.innerHTML =
+        '<div class="d">' + niceDate(k) + (label ? "<small>" + label + "</small>" : "") + "</div>" +
+        "<b>" + dayCount(job,k) + "</b>";
+      const minus = document.createElement("button");
+      minus.type = "button"; minus.className = "mini"; minus.textContent = "−";
+      minus.addEventListener("click", () => bump(job, k, -1, false));
+      const plus = document.createElement("button");
+      plus.type = "button"; plus.className = "mini"; plus.textContent = "+";
+      plus.addEventListener("click", () => bump(job, k, +1, false));
+      row.appendChild(minus); row.appendChild(plus);
+      hist.appendChild(row);
+    }
+
+    renderJobs();
+  }
+
+  function renderJobs(){
+    const list = $("jobsList");
+    list.innerHTML = "";
+    for (const j of state.jobs){
+      const el = document.createElement("div");
+      el.className = "jobitem" + (j.id === state.active ? " active" : "");
+      el.innerHTML = '<div class="jn">' + esc(j.name) + "<small>since " + niceDate(j.created) +
+                     "</small></div>" + '<div class="tot">' + jobTotal(j) + "</div>";
+      el.addEventListener("click", () => {
+        state.active = j.id; save();
+        deleteBtn.textContent = "DELETE JOB";
+        $("renameInput").value = j.name;
+        render();
+      });
+      list.appendChild(el);
+    }
+    const ri = $("renameInput");
+    if (document.activeElement !== ri) ri.value = activeJob().name;
+  }
+
+  const esc = s => s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  // ---- main buttons ----
+  $("bigBtn").addEventListener("click", () => {
+    bump(activeJob(), todayKey(), +1, true);
+    if (navigator.vibrate) navigator.vibrate(30);
+  });
+  $("undoBtn").addEventListener("click", () => bump(activeJob(), todayKey(), -1, false));
+
+  // ---- new job panel ----
+  const newJobPanel = $("newJobPanel"), jobsPanel = $("jobsPanel");
+  $("newJobBtn").addEventListener("click", () => {
+    jobsPanel.classList.remove("open");
+    newJobPanel.classList.toggle("open");
+    $("newJobName").value = "";
+    if (newJobPanel.classList.contains("open")) $("newJobName").focus();
+  });
+  $("newJobCancel").addEventListener("click", () => newJobPanel.classList.remove("open"));
+  $("newJobStart").addEventListener("click", () => {
+    const name = $("newJobName").value.trim() || "Job " + (state.jobs.length + 1);
+    const job = newJob(name);
+    state.jobs.unshift(job);
+    state.active = job.id;
+    newJobPanel.classList.remove("open");
+    save(); render();
+  });
+
+  // ---- jobs panel ----
+  const deleteBtn = $("deleteBtn");
+  $("jobsBtn").addEventListener("click", () => {
+    newJobPanel.classList.remove("open");
+    jobsPanel.classList.toggle("open");
+    deleteBtn.textContent = "DELETE JOB";
+  });
+  $("renameBtn").addEventListener("click", () => {
+    const name = $("renameInput").value.trim();
+    if (name){ activeJob().name = name; save(); render(); }
+  });
+  deleteBtn.addEventListener("click", () => {
+    if (deleteBtn.textContent !== "TAP AGAIN TO CONFIRM"){
+      deleteBtn.textContent = "TAP AGAIN TO CONFIRM";
+      return;
+    }
+    const job = activeJob();
+    state.jobs = state.jobs.filter(j => j.id !== job.id);
+    if (!state.jobs.length) state.jobs = [newJob("Job 1")];
+    state.active = state.jobs[0].id;
+    deleteBtn.textContent = "DELETE JOB";
+    save(); render();
+  });
+
+  // ---- clock ----
+  function tickClock(){
+    const now = new Date();
+    let h = now.getHours();
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    $("clockTime").innerHTML = h + ":" + pad(now.getMinutes()) + "<small>" + ampm + "</small>";
+    $("clockDate").textContent = now.toLocaleDateString(undefined,
+      {weekday:"long", month:"long", day:"numeric"});
+  }
+  setInterval(tickClock, 1000);
+  tickClock();
+
+  // ---- keep screen on (wake lock) ----
+  const AWAKE_KEY = "silage-loads-awake";
+  const awakeBtn = $("awakeBtn");
+  let wakeLock = null;
+  let awakeWanted = false;
+  try { awakeWanted = localStorage.getItem(AWAKE_KEY) === "1"; } catch(e){}
+
+  function paintAwake(){
+    awakeBtn.classList.toggle("on", !!wakeLock);
+    awakeBtn.innerHTML = wakeLock ? "SCREEN<br>STAYING ON" : "KEEP<br>SCREEN ON";
+  }
+  async function acquireAwake(){
+    if (!awakeWanted || wakeLock || document.hidden) return;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; paintAwake(); });
+    } catch(e){ wakeLock = null; }
+    paintAwake();
+  }
+  if ("wakeLock" in navigator){
+    awakeBtn.addEventListener("click", async () => {
+      awakeWanted = !wakeLock;
+      try { localStorage.setItem(AWAKE_KEY, awakeWanted ? "1" : "0"); } catch(e){}
+      if (awakeWanted) await acquireAwake();
+      else if (wakeLock){ wakeLock.release(); wakeLock = null; }
+      paintAwake();
+    });
+    // Some browsers refuse a wake lock before the first touch — retry on it.
+    document.addEventListener("pointerdown", acquireAwake, { once:true });
+    acquireAwake();
+  } else {
+    awakeBtn.style.display = "none";
+  }
+
+  // Roll the display over at midnight / when the app comes back to the foreground.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden){ render(); tickClock(); acquireAwake(); }
+  });
+  setInterval(render, 60000);
+
+  render();
+
+  if ("serviceWorker" in navigator && location.protocol === "https:"){
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
