@@ -111,6 +111,7 @@
 <div id="app">
   <header>
     <h1>Silage Loads</h1>
+    <a class="hbtn" id="widgetLink" href="widget.html" style="text-decoration:none;">BIG +/−</a>
     <button class="hbtn" id="jobsBtn" type="button">JOBS</button>
     <button class="hbtn primary" id="newJobBtn" type="button">+ NEW JOB</button>
   </header>
@@ -224,7 +225,10 @@
   const dayCount = (job, key) => (job.days[key] && job.days[key].count) || 0;
   const jobTotal = job => Object.values(job.days).reduce((a,d) => a + d.count, 0);
 
-  function bump(job, key, delta, logTime){
+  function bump(jobId, key, delta, logTime){
+    // Re-read storage first so a count added from the widget view isn't clobbered.
+    state = load();
+    const job = state.jobs.find(j => j.id === jobId) || activeJob();
     const day = job.days[key] || (job.days[key] = { count: 0, times: [] });
     day.count = Math.max(0, day.count + delta);
     if (delta > 0 && logTime) day.times.push(Date.now());
@@ -268,10 +272,10 @@
         "<b>" + dayCount(job,k) + "</b>";
       const minus = document.createElement("button");
       minus.type = "button"; minus.className = "mini"; minus.textContent = "−";
-      minus.addEventListener("click", () => bump(job, k, -1, false));
+      minus.addEventListener("click", () => bump(job.id, k, -1, false));
       const plus = document.createElement("button");
       plus.type = "button"; plus.className = "mini"; plus.textContent = "+";
-      plus.addEventListener("click", () => bump(job, k, +1, false));
+      plus.addEventListener("click", () => bump(job.id, k, +1, false));
       row.appendChild(minus); row.appendChild(plus);
       hist.appendChild(row);
     }
@@ -303,10 +307,10 @@
 
   // ---- main buttons ----
   $("bigBtn").addEventListener("click", () => {
-    bump(activeJob(), todayKey(), +1, true);
+    bump(activeJob().id, todayKey(), +1, true);
     if (navigator.vibrate) navigator.vibrate(30);
   });
-  $("undoBtn").addEventListener("click", () => bump(activeJob(), todayKey(), -1, false));
+  $("undoBtn").addEventListener("click", () => bump(activeJob().id, todayKey(), -1, false));
 
   // ---- new job panel ----
   const newJobPanel = $("newJobPanel"), jobsPanel = $("jobsPanel");
@@ -397,9 +401,14 @@
     awakeBtn.style.display = "none";
   }
 
+  // Live-sync when the widget view changes the count in another tab/window.
+  window.addEventListener("storage", e => {
+    if (e.key === KEY){ state = load(); render(); }
+  });
+
   // Roll the display over at midnight / when the app comes back to the foreground.
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden){ render(); tickClock(); acquireAwake(); }
+    if (!document.hidden){ state = load(); render(); tickClock(); acquireAwake(); }
   });
   setInterval(render, 60000);
 
