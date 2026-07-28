@@ -45,6 +45,16 @@
   .card{border:1.5px solid var(--line); border-radius:8px; background:var(--panel); padding:14px;}
   .lbl{font:600 11px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--muted);}
 
+  #clockCard{display:flex; align-items:center; gap:12px; padding:12px 14px;}
+  #clockTime{font:600 clamp(40px,13vw,56px)/1 var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+  #clockTime small{font-size:.45em; font-weight:500; color:var(--muted); margin-left:4px;}
+  #clockDate{font:500 13px/1.3 var(--sans); color:var(--muted); margin-top:4px;}
+  #awakeBtn{margin-left:auto; font:700 11px/1.35 var(--sans); letter-spacing:.08em; padding:11px 12px;
+            border-radius:6px; border:1.5px solid var(--line); background:var(--panel); color:var(--muted);
+            cursor:pointer; text-align:center;}
+  #awakeBtn:active{transform:translateY(1px); background:var(--panel2);}
+  #awakeBtn.on{border-color:var(--good); color:var(--good);}
+
   #jobRow{display:flex; align-items:center; gap:8px;}
   #jobName{font:700 18px/1.2 var(--sans); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   #jobStarted{font:400 12px/1 var(--sans); color:var(--muted);}
@@ -121,6 +131,14 @@
       <button class="hbtn" id="renameBtn" type="button">RENAME</button>
       <button class="hbtn danger" id="deleteBtn" type="button">DELETE JOB</button>
     </div>
+  </div>
+
+  <div class="card" id="clockCard">
+    <div>
+      <div id="clockTime">--:--</div>
+      <div id="clockDate"></div>
+    </div>
+    <button id="awakeBtn" type="button">KEEP<br>SCREEN ON</button>
   </div>
 
   <div class="card">
@@ -330,8 +348,57 @@
     save(); render();
   });
 
+  // ---- clock ----
+  function tickClock(){
+    const now = new Date();
+    let h = now.getHours();
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    $("clockTime").innerHTML = h + ":" + pad(now.getMinutes()) + "<small>" + ampm + "</small>";
+    $("clockDate").textContent = now.toLocaleDateString(undefined,
+      {weekday:"long", month:"long", day:"numeric"});
+  }
+  setInterval(tickClock, 1000);
+  tickClock();
+
+  // ---- keep screen on (wake lock) ----
+  const AWAKE_KEY = "silage-loads-awake";
+  const awakeBtn = $("awakeBtn");
+  let wakeLock = null;
+  let awakeWanted = false;
+  try { awakeWanted = localStorage.getItem(AWAKE_KEY) === "1"; } catch(e){}
+
+  function paintAwake(){
+    awakeBtn.classList.toggle("on", !!wakeLock);
+    awakeBtn.innerHTML = wakeLock ? "SCREEN<br>STAYING ON" : "KEEP<br>SCREEN ON";
+  }
+  async function acquireAwake(){
+    if (!awakeWanted || wakeLock || document.hidden) return;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; paintAwake(); });
+    } catch(e){ wakeLock = null; }
+    paintAwake();
+  }
+  if ("wakeLock" in navigator){
+    awakeBtn.addEventListener("click", async () => {
+      awakeWanted = !wakeLock;
+      try { localStorage.setItem(AWAKE_KEY, awakeWanted ? "1" : "0"); } catch(e){}
+      if (awakeWanted) await acquireAwake();
+      else if (wakeLock){ wakeLock.release(); wakeLock = null; }
+      paintAwake();
+    });
+    // Some browsers refuse a wake lock before the first touch — retry on it.
+    document.addEventListener("pointerdown", acquireAwake, { once:true });
+    acquireAwake();
+  } else {
+    awakeBtn.style.display = "none";
+  }
+
   // Roll the display over at midnight / when the app comes back to the foreground.
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden){ render(); tickClock(); acquireAwake(); }
+  });
   setInterval(render, 60000);
 
   render();
