@@ -12,6 +12,6 @@ A precision shop instrument for your phone — installable PWA, works offline.
 
 Single-file app (`index.html`) — no build step, no dependencies.
 
-## Silage Loads (`silage-loads.html`)
+## Silage Loads (`silage/`)
 
-Tally counter for hauling: one big button per load, shows today / yesterday / job total, per-day history with fix-up +/− buttons, and a **New Job** button that starts a fresh tracker for each field while keeping the old ones. Counts save on the phone (localStorage), works offline once visited.
+Separate app, own home-screen icon: tally counter for hauling. One big button per load, shows today / yesterday / job total, dash clock with keep-screen-on, per-day history with fix-up +/− buttons, and a **New Job** button that starts a fresh tracker for each field while keeping the old ones. Counts save on the phone (localStorage), works offline once visited. Install from `<pages-url>/silage/`.

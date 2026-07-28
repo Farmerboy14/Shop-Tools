@@ -1,4 +1,4 @@
-const CACHE = "shop-level-v3";
+const CACHE = "silage-loads-v1";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -13,7 +13,7 @@ self.addEventListener("activate", e => {
   );
 });
 
-// Stale-while-revalidate: serve from cache instantly (works offline in the shop),
+// Stale-while-revalidate: serve from cache instantly (works with no signal in the field),
 // refresh the cache in the background so the next launch picks up updates.
 self.addEventListener("fetch", e => {
   const req = e.request;
