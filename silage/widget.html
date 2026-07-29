@@ -74,14 +74,23 @@
   const todayKey = () => { const d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); };
 
+  function migrate(s){
+    for (const j of s.jobs) for (const k in j.days){
+      const d = j.days[k];
+      if (!d.loads) d.loads = (d.times || []).map(t => ({ t }));
+      delete d.times;
+    }
+    return s;
+  }
+
   function load(){
     const raw = store.get();
     if (raw){
       try { const s = JSON.parse(raw);
-        if (s && Array.isArray(s.jobs) && s.jobs.length) return s; } catch(e){}
+        if (s && Array.isArray(s.jobs) && s.jobs.length) return migrate(s); } catch(e){}
     }
     const job = { id: "j" + Math.random().toString(36).slice(2,9), name: "Job 1",
-                  created: "2026-07-27", days: { "2026-07-27": { count: 10, times: [] } } };
+                  created: "2026-07-27", days: { "2026-07-27": { count: 10, loads: [] } } };
     const s = { jobs: [job], active: job.id };
     store.set(JSON.stringify(s));
     return s;
@@ -101,12 +110,31 @@
     const s = load();
     const job = activeJob(s);
     const k = todayKey();
-    const day = job.days[k] || (job.days[k] = { count: 0, times: [] });
+    const day = job.days[k] || (job.days[k] = { count: 0, loads: [] });
     day.count = Math.max(0, day.count + delta);
-    if (delta > 0) day.times.push(Date.now());
-    else if (day.times.length) day.times.pop();
+    if (delta > 0){
+      const t = Date.now();
+      day.loads.push({ t });
+      geoStamp(job.id, k, t);
+    } else if (day.loads.length) day.loads.pop();
     store.set(JSON.stringify(s));
     render();
+  }
+
+  // Attach GPS coords to a just-logged load once the fix arrives.
+  function geoStamp(jobId, key, t){
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      const s = load();
+      const job = s.jobs.find(j => j.id === jobId);
+      const day = job && job.days[key];
+      const entry = day && day.loads.find(l => l.t === t);
+      if (entry){
+        entry.lat = +pos.coords.latitude.toFixed(5);
+        entry.lng = +pos.coords.longitude.toFixed(5);
+        store.set(JSON.stringify(s));
+      }
+    }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
   }
 
   document.getElementById("plus").addEventListener("click", () => {
