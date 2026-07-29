@@ -65,7 +65,10 @@ class LoadWidget : AppWidgetProvider() {
     override fun onReceive(ctx: Context, intent: Intent) {
         super.onReceive(ctx, intent)
         when (intent.action) {
-            ACTION_PLUS -> LoadStore.addLoad(ctx)
+            ACTION_PLUS -> {
+                LoadStore.addLoad(ctx)
+                Sync.pushLoadForActive(ctx, auto = false, lat = null, lng = null)
+            }
             ACTION_MINUS -> LoadStore.removeLoad(ctx)
             else -> return
         }

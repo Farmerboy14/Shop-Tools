@@ -40,7 +40,10 @@ jobs:
 
       # Artifacts need a GitHub login to download, which the other drivers
       # won't have. A release asset is a plain public link they can tap.
+      # Only workflow_dispatch updates it: pushes verify the build compiles
+      # without touching the APK the drivers are installing.
       - name: Publish to the "latest" release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

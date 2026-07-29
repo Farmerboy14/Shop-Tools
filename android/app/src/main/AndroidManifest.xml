@@ -49,6 +49,13 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
 
         <activity
+            android:name=".AccountActivity"
+            android:exported="false"
+            android:label="Account"
+            android:screenOrientation="fullUser"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
+        <activity
             android:name=".OfflineMapsActivity"
             android:exported="false"
             android:label="Offline maps"

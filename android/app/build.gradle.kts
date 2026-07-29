@@ -43,4 +43,14 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.18")
     // Renders downloaded per-state offline map files (vector, full detail).
     implementation("org.osmdroid:osmdroid-mapsforge:6.1.18")
+    // Accounts + shared jobs. Dormant until google-services.json is added.
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-database")
+}
+
+// Sharing goes live only when the Firebase config file exists; without it the
+// app builds fine and the crew features show as "needs setup".
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }

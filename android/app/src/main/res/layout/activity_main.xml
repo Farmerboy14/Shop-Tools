@@ -323,6 +323,71 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- crew: account + shared job -->
+            <LinearLayout
+                style="@style/Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/Label"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/crew" />
+
+                    <Button
+                        android:id="@+id/accountBtn"
+                        style="@style/ChunkyButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/account" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/crewInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:lineSpacingMultiplier="1.3"
+                    android:textColor="@color/muted"
+                    android:textSize="13sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/shareJobBtn"
+                        style="@style/ChunkyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:minHeight="48dp"
+                        android:text="@string/share_job" />
+
+                    <Button
+                        android:id="@+id/joinJobBtn"
+                        style="@style/ChunkyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:minHeight="48dp"
+                        android:text="@string/join_job" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- stats -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -438,6 +503,16 @@
             android:textColor="@color/dim_clock"
             android:textSize="56sp"
             android:textStyle="bold" />
+
+        <!-- nearby crew, radar style: names not map tiles, so the screen
+             stays near-black and cheap -->
+        <LinearLayout
+            android:id="@+id/dimCrew"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical" />
 
         <TextView
             android:layout_width="wrap_content"

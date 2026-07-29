@@ -58,6 +58,7 @@ object AutoCounter {
         prefs(app).edit().putLong(KEY_LAST, now).putBoolean(KEY_ARMED, false).apply()
 
         val count = LoadStore.addLoad(app, auto = true, lat = lat, lng = lng)
+        Sync.pushLoadForActive(app, auto = true, lat = lat, lng = lng)
         LoadWidget.refresh(app)
         notify(app, count)
         return true

@@ -30,6 +30,15 @@
     <string name="offline_maps">Offline maps — pick your states</string>
     <string name="offline_maps_hint">Downloaded states draw at full detail with no signal</string>
     <string name="get_map">GET</string>
+    <string name="crew">CREW · SHARED JOB</string>
+    <string name="account">ACCOUNT</string>
+    <string name="share_job">SHARE THIS JOB</string>
+    <string name="join_job">JOIN A JOB</string>
+    <string name="save">SAVE</string>
+    <string name="account_title">Your account</string>
+    <string name="account_hint">How you show up to the rest of the crew — on their map and in the shared load log. Lives on this phone; no password.</string>
+    <string name="your_name">Name</string>
+    <string name="your_vehicle">Vehicle (what you drive)</string>
     <string name="delete">DELETE</string>
     <string name="cancel">CANCEL</string>
     <string name="history">HISTORY (THIS JOB)</string>

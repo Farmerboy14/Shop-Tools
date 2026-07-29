@@ -90,6 +90,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var zoneSetBtn: Button
     private lateinit var zoneClearBtn: Button
     private lateinit var permBtn: Button
+    private lateinit var crewInfo: TextView
+    private lateinit var shareJobBtn: Button
+    private lateinit var dimCrew: LinearLayout
+    private var posListening: Sync.Listening? = null
+    private var zoneListening: Sync.Listening? = null
+    private var crewDrivers: List<Sync.Driver> = emptyList()
+    private var lastOwnLat: Double? = null
+    private var lastOwnLng: Double? = null
+    private val dimCrewTick = object : Runnable {
+        override fun run() {
+            refreshOwnFixForDim()
+            ui.postDelayed(this, 60_000L)
+        }
+    }
     private lateinit var coordInput: EditText
     private lateinit var awakeBtn: Button
     private lateinit var dimBtn: Button
@@ -145,6 +159,9 @@ class MainActivity : AppCompatActivity() {
         zoneSetBtn = findViewById(R.id.zoneSetBtn)
         zoneClearBtn = findViewById(R.id.zoneClearBtn)
         permBtn = findViewById(R.id.permBtn)
+        crewInfo = findViewById(R.id.crewInfo)
+        shareJobBtn = findViewById(R.id.shareJobBtn)
+        dimCrew = findViewById(R.id.dimCrew)
         coordInput = findViewById(R.id.coordInput)
         awakeBtn = findViewById(R.id.awakeBtn)
         dimBtn = findViewById(R.id.dimBtn)
@@ -157,10 +174,16 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.bigBtn).setOnClickListener {
             LoadStore.addLoad(this)
+            Sync.pushLoadForActive(this, auto = false, lat = null, lng = null)
             buzz(30)
             LoadWidget.refresh(this)
             render()
         }
+        findViewById<Button>(R.id.accountBtn).setOnClickListener {
+            startActivity(Intent(this, AccountActivity::class.java))
+        }
+        shareJobBtn.setOnClickListener { shareFlow() }
+        findViewById<Button>(R.id.joinJobBtn).setOnClickListener { joinFlow() }
         findViewById<Button>(R.id.undoBtn).setOnClickListener {
             LoadStore.removeLoad(this)
             LoadWidget.refresh(this)
@@ -177,6 +200,7 @@ class MainActivity : AppCompatActivity() {
         zoneClearBtn.setOnClickListener {
             LoadStore.clearZone(this)
             GeofenceManager.sync(this)
+            Sync.publishZone(this)
             render()
         }
         findViewById<Button>(R.id.coordBtn).setOnClickListener { onSetZoneFromText() }
@@ -210,6 +234,7 @@ class MainActivity : AppCompatActivity() {
         clockTick.run()
         GeofenceManager.sync(this)
         ZoneWatchService.start(this)   // no-op unless a zone is set and auto is on
+        attachCrewListeners()
         render()
         armDim()
     }
@@ -218,6 +243,8 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         ui.removeCallbacks(clockTick)
         ui.removeCallbacks(dimTick)
+        ui.removeCallbacks(dimCrewTick)
+        detachCrewListeners()
     }
 
     /** Any touch anywhere restarts the idle countdown. */
@@ -249,7 +276,219 @@ class MainActivity : AppCompatActivity() {
 
         renderHistory(job)
         renderZone(job)
+        renderCrew(job)
         if (dimShown) dimCount.text = count.toString()
+    }
+
+    // ---- crew: account, share, join ----------------------------------------
+
+    private fun renderCrew(job: JSONObject) {
+        val name = Sync.myName(this)
+        val vehicle = Sync.myVehicle(this)
+        val code = job.optString("share")
+        val you = if (name.isEmpty()) "Set your name in ACCOUNT so the crew knows who you are."
+            else "You: $name" + (if (vehicle.isEmpty()) "" else " · $vehicle")
+        val line = when {
+            !Sync.configured(this) ->
+                "$you\nSharing needs a one-time setup in this build before codes work."
+            code.isEmpty() ->
+                "$you\nShare this job to get a code the crew can join with — they'll " +
+                    "get the same dump spot, and you'll see each other while hauling."
+            else -> {
+                val others = crewDrivers.size
+                "$you\nJob code: $code · " +
+                    (if (others == 0) "no other drivers live right now"
+                     else "$others other driver" + (if (others > 1) "s" else "") + " live")
+            }
+        }
+        crewInfo.text = line
+        shareJobBtn.text = if (code.isEmpty()) getString(R.string.share_job) else "CODE $code"
+    }
+
+    private fun shareFlow() {
+        if (!Sync.configured(this)) {
+            AlertDialog.Builder(this)
+                .setTitle("Sharing isn't switched on yet")
+                .setMessage(
+                    "The crew features need a one-time (free) setup of the shared " +
+                        "database this build was made without. Once it's in, this button " +
+                        "makes a join code."
+                )
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        val job = LoadStore.activeJob(LoadStore.read(this))
+        val existing = job.optString("share")
+        if (existing.isNotEmpty()) { showCodeDialog(existing); return }
+        if (Sync.myName(this).isEmpty()) {
+            startActivity(Intent(this, AccountActivity::class.java))
+            return
+        }
+        Sync.createShare(this, job) { code ->
+            if (code == null) {
+                crewInfo.text = "Couldn't create the share — check signal and try again."
+                return@createShare
+            }
+            val state = LoadStore.read(this)
+            LoadStore.activeJob(state).put("share", code)
+            LoadStore.write(this, state)
+            attachCrewListeners()
+            render()
+            showCodeDialog(code)
+        }
+    }
+
+    private fun showCodeDialog(code: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Job code")
+            .setMessage(
+                "\n        $code\n\nText this to your drivers. In their app: " +
+                    "JOIN A JOB → type the code. They get this job with the same " +
+                    "dump spot, and everyone shows up on each other's crew list."
+            )
+            .setPositiveButton("Done", null)
+            .show()
+    }
+
+    private fun joinFlow() {
+        if (!Sync.configured(this)) { shareFlow(); return }
+        if (Sync.myName(this).isEmpty()) {
+            startActivity(Intent(this, AccountActivity::class.java))
+            return
+        }
+        val input = EditText(this).apply {
+            hint = "Code, like K7M2PW"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Join a job")
+            .setView(input)
+            .setPositiveButton("Join") { _, _ ->
+                val code = input.text.toString().trim().uppercase(Locale.US)
+                if (code.isEmpty()) return@setPositiveButton
+                Sync.join(this, code) { jobName, zone ->
+                    if (jobName == null) {
+                        AlertDialog.Builder(this)
+                            .setMessage("No job found for \"$code\" — check the code and your signal.")
+                            .setPositiveButton("OK", null).show()
+                        return@join
+                    }
+                    val state = LoadStore.read(this)
+                    val job = LoadStore.newJob(jobName)
+                    job.put("share", code)
+                    if (zone != null) job.put("zone", zone)
+                    val jobs = org.json.JSONArray().put(job)
+                    val existing = LoadStore.jobs(state)
+                    for (i in 0 until existing.length()) jobs.put(existing.getJSONObject(i))
+                    state.put("jobs", jobs).put("active", job.getString("id"))
+                    LoadStore.write(this, state)
+                    expanded.clear()
+                    GeofenceManager.sync(this)
+                    LoadWidget.refresh(this)
+                    attachCrewListeners()
+                    render()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun attachCrewListeners() {
+        detachCrewListeners()
+        val code = LoadStore.activeJob(LoadStore.read(this)).optString("share")
+        if (code.isEmpty() || !Sync.configured(this)) return
+        posListening = Sync.listenPositions(this, code) { drivers ->
+            crewDrivers = drivers
+            renderCrew(LoadStore.activeJob(LoadStore.read(this)))
+            if (dimShown) updateDimCrew()
+        }
+        zoneListening = Sync.listenZone(this, code) { remote -> applyRemoteZone(remote) }
+    }
+
+    private fun detachCrewListeners() {
+        posListening?.stop(); posListening = null
+        zoneListening?.stop(); zoneListening = null
+        crewDrivers = emptyList()
+    }
+
+    /** A crew member moved the dump spot — take it, keeping our own auto flag. */
+    private fun applyRemoteZone(remote: JSONObject?) {
+        val state = LoadStore.read(this)
+        val job = LoadStore.activeJob(state)
+        if (job.optString("share").isEmpty()) return
+        val local = LoadStore.zone(job)
+        if (remote == null) {
+            if (local == null) return
+            job.remove("zone")
+        } else {
+            if (local != null &&
+                local.optDouble("lat") == remote.optDouble("lat") &&
+                local.optDouble("lng") == remote.optDouble("lng") &&
+                local.optInt("r") == remote.optInt("r")
+            ) return
+            remote.put("auto", local?.optBoolean("auto") ?: false)
+            job.put("zone", remote)
+        }
+        LoadStore.write(this, state)
+        GeofenceManager.sync(this)
+        render()
+    }
+
+    // ---- dim-mode crew radar ------------------------------------------------
+
+    private fun updateDimCrew() {
+        dimCrew.removeAllViews()
+        val code = LoadStore.activeJob(LoadStore.read(this)).optString("share")
+        if (code.isEmpty() || crewDrivers.isEmpty()) return
+        val lat = lastOwnLat
+        val lng = lastOwnLng
+        val sorted = if (lat != null && lng != null) {
+            crewDrivers.sortedBy { AutoCounter.metresBetween(lat, lng, it.lat, it.lng) }
+        } else crewDrivers
+        for (driver in sorted.take(3)) {
+            var text = driver.name.uppercase(Locale.getDefault())
+            if (driver.vehicle.isNotEmpty()) text += " · " + driver.vehicle.uppercase(Locale.getDefault())
+            if (lat != null && lng != null) {
+                val meters = AutoCounter.metresBetween(lat, lng, driver.lat, driver.lng)
+                text += " · " + fmtMiles(meters) + " " + Sync.compass(lat, lng, driver.lat, driver.lng)
+            }
+            dimCrew.addView(TextView(this).apply {
+                this.text = text
+                setTextColor(getColor(R.color.dim_clock))
+                textSize = 17f
+                typeface = android.graphics.Typeface.MONOSPACE
+                setPadding(0, dp(3), 0, dp(3))
+            })
+        }
+    }
+
+    private fun fmtMiles(m: Double): String =
+        if (m < 305) "${(m * 3.28084).roundToInt()} FT" else String.format("%.1f MI", m / 1609.34)
+
+    /** Freshest own position for radar distances: the watcher's fix, else ask. */
+    @SuppressLint("MissingPermission")
+    private fun refreshOwnFixForDim() {
+        val fix = getSharedPreferences("last_fix", Context.MODE_PRIVATE)
+        val t = fix.getLong("t", 0L)
+        if (System.currentTimeMillis() - t < 3 * 60_000L) {
+            lastOwnLat = fix.getString("lat", null)?.toDoubleOrNull()
+            lastOwnLng = fix.getString("lng", null)?.toDoubleOrNull()
+            updateDimCrew()
+            return
+        }
+        if (!GeofenceManager.hasForegroundLocation(this)) return
+        LocationServices.getFusedLocationProviderClient(this)
+            .getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
+            .addOnSuccessListener { loc ->
+                loc ?: return@addOnSuccessListener
+                lastOwnLat = loc.latitude
+                lastOwnLng = loc.longitude
+                Sync.publishPosition(this, loc.latitude, loc.longitude)
+                updateDimCrew()
+            }
     }
 
     private fun renderHistory(job: JSONObject) {
@@ -418,8 +657,10 @@ class MainActivity : AppCompatActivity() {
                 stateListAnimator = null
                 setPadding(dp(6), 0, dp(6), 0)
                 setOnClickListener {
-                    if (zone != null) LoadStore.setZoneRadius(this@MainActivity, r.meters)
-                    else pendingRadius = r.meters
+                    if (zone != null) {
+                        LoadStore.setZoneRadius(this@MainActivity, r.meters)
+                        Sync.publishZone(this@MainActivity)
+                    } else pendingRadius = r.meters
                     GeofenceManager.sync(this@MainActivity)
                     render()
                 }
@@ -541,6 +782,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 LoadStore.setZone(this, loc.latitude, loc.longitude, currentRadius())
                 GeofenceManager.sync(this)
+                Sync.publishZone(this)
                 render()
             }
             .addOnFailureListener {
@@ -557,6 +799,7 @@ class MainActivity : AppCompatActivity() {
         LoadStore.setZone(this, parsed.first, parsed.second, currentRadius())
         coordInput.setText("")
         GeofenceManager.sync(this)
+        Sync.publishZone(this)
         if (!GeofenceManager.hasBackgroundLocation(this)) requestLocation()
         render()
     }
@@ -758,10 +1001,16 @@ class MainActivity : AppCompatActivity() {
         tickClock()
         dimOverlay.visibility = View.VISIBLE
         dimShown = true
+        if (job.optString("share").isNotEmpty()) {
+            updateDimCrew()
+            ui.removeCallbacks(dimCrewTick)
+            dimCrewTick.run()
+        }
     }
 
     private fun hideDim() {
         dimOverlay.visibility = View.GONE
+        ui.removeCallbacks(dimCrewTick)
         if (dimShown) {
             dimShown = false
             ui.removeCallbacks(dimTick)

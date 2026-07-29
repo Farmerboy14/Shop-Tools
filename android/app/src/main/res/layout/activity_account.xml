@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            style="@style/Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/account_title" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/account_hint"
+            android:textColor="@color/muted"
+            android:textSize="13sp" />
+
+        <TextView
+            style="@style/Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="@string/your_name" />
+
+        <EditText
+            android:id="@+id/accountName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_row"
+            android:hint="Caleb"
+            android:importantForAutofill="no"
+            android:inputType="textPersonName|textCapWords"
+            android:minHeight="52dp"
+            android:padding="12dp"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/muted" />
+
+        <TextView
+            style="@style/Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/your_vehicle" />
+
+        <EditText
+            android:id="@+id/accountVehicle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_row"
+            android:hint="Red Peterbilt 379"
+            android:importantForAutofill="no"
+            android:inputType="text|textCapWords"
+            android:minHeight="52dp"
+            android:padding="12dp"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/muted" />
+
+        <Button
+            android:id="@+id/accountSaveBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_btn_accent"
+            android:minHeight="56dp"
+            android:text="@string/save"
+            android:textColor="@color/accent_ink"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/accountStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:lineSpacingMultiplier="1.35"
+            android:textColor="@color/muted"
+            android:textSize="13sp" />
+    </LinearLayout>
+</ScrollView>

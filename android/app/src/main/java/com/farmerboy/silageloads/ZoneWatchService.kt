@@ -114,6 +114,14 @@ class ZoneWatchService : Service() {
     }
 
     private fun onFix(location: Location) {
+        // freshest fix for the dim-screen radar, and the crew's live map
+        getSharedPreferences("last_fix", Context.MODE_PRIVATE).edit()
+            .putString("lat", location.latitude.toString())
+            .putString("lng", location.longitude.toString())
+            .putLong("t", System.currentTimeMillis())
+            .apply()
+        Sync.publishPosition(this, location.latitude, location.longitude)
+
         val zone = LoadStore.zone(LoadStore.activeJob(LoadStore.read(this)))
         if (zone == null || !zone.optBoolean("auto")) {
             stopSelf()
