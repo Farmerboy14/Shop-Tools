@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofenceStatusCodes
 import com.google.android.gms.location.GeofencingRequest
 import com.google.android.gms.location.LocationServices
 
@@ -40,6 +41,24 @@ object GeofenceManager {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    private const val PREFS = "silage_loads_fence"
+    private const val KEY_STATUS = "fence_status"
+
+    /** What the last registration attempt did, for the UI to show. */
+    fun status(ctx: Context): String =
+        ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_STATUS, "") ?: ""
+
+    /** When the geofence last counted a load, or 0. Written by GeofenceReceiver. */
+    fun lastAutoCount(ctx: Context): Long =
+        ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getLong("last_auto_ms", 0L)
+
+    private fun setStatus(ctx: Context, s: String) {
+        ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_STATUS, s).apply()
+    }
+
     /**
      * Re-register from whatever is currently stored. Safe to call any time —
      * on zone change, on toggling auto, at boot, and on app start.
@@ -49,8 +68,23 @@ object GeofenceManager {
         val state = LoadStore.read(app)
         val zone = LoadStore.zone(LoadStore.activeJob(state))
         val wanted = zone != null && zone.optBoolean("auto")
-        remove(app)
-        if (!wanted || !hasBackgroundLocation(app)) return
+
+        if (!wanted) {
+            // Only remove when we actually want it off. Removing right before an
+            // add is a race: both calls are async, and a late-landing removal
+            // silently wipes the geofence we just registered.
+            remove(app)
+            setStatus(app, if (zone == null) "no zone set" else "auto is off")
+            return
+        }
+        if (!hasForegroundLocation(app)) {
+            setStatus(app, "BLOCKED: location permission not granted")
+            return
+        }
+        if (!hasBackgroundLocation(app)) {
+            setStatus(app, "BLOCKED: needs \"Allow all the time\"")
+            return
+        }
 
         val fence = Geofence.Builder()
             .setRequestId(FENCE_ID)
@@ -78,9 +112,28 @@ object GeofenceManager {
             .build()
 
         try {
-            LocationServices.getGeofencingClient(app).addGeofences(request, pendingIntent(app))
-        } catch (_: SecurityException) {
-            // Permission revoked between the check and the call; nothing to do.
+            // addGeofences replaces any existing fence with the same request id,
+            // so there is no need to remove first.
+            LocationServices.getGeofencingClient(app)
+                .addGeofences(request, pendingIntent(app))
+                .addOnSuccessListener { setStatus(app, "watching for arrivals") }
+                .addOnFailureListener { e -> setStatus(app, "FAILED: " + describe(e)) }
+        } catch (e: SecurityException) {
+            setStatus(app, "BLOCKED: permission revoked")
+        }
+    }
+
+    /** Turn Play Services' geofence errors into something readable on the phone. */
+    private fun describe(e: Exception): String {
+        val code = (e as? com.google.android.gms.common.api.ApiException)?.statusCode
+        return when (code) {
+            GeofenceStatusCodes.GEOFENCE_NOT_AVAILABLE ->
+                "location services off, or Google location accuracy is disabled"
+            GeofenceStatusCodes.GEOFENCE_TOO_MANY_GEOFENCES -> "too many geofences"
+            GeofenceStatusCodes.GEOFENCE_TOO_MANY_PENDING_INTENTS -> "too many pending intents"
+            GeofenceStatusCodes.GEOFENCE_INSUFFICIENT_LOCATION_PERMISSION ->
+                "insufficient location permission"
+            else -> e.message ?: "unknown error"
         }
     }
 

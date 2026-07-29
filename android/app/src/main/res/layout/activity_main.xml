@@ -238,6 +238,17 @@
                     android:textColor="@color/muted"
                     android:textSize="13sp" />
 
+                <Button
+                    android:id="@+id/permBtn"
+                    style="@style/ChunkyButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="48dp"
+                    android:text="@string/fix_permission"
+                    android:textColor="@color/warn"
+                    android:visibility="gone" />
+
                 <LinearLayout
                     android:id="@+id/radiusRow"
                     android:layout_width="match_parent"

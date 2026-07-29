@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var autoBtn: Button
     private lateinit var zoneSetBtn: Button
     private lateinit var zoneClearBtn: Button
+    private lateinit var permBtn: Button
     private lateinit var coordInput: EditText
     private lateinit var awakeBtn: Button
     private lateinit var dimBtn: Button
@@ -143,6 +144,7 @@ class MainActivity : AppCompatActivity() {
         autoBtn = findViewById(R.id.autoBtn)
         zoneSetBtn = findViewById(R.id.zoneSetBtn)
         zoneClearBtn = findViewById(R.id.zoneClearBtn)
+        permBtn = findViewById(R.id.permBtn)
         coordInput = findViewById(R.id.coordInput)
         awakeBtn = findViewById(R.id.awakeBtn)
         dimBtn = findViewById(R.id.dimBtn)
@@ -175,6 +177,7 @@ class MainActivity : AppCompatActivity() {
             render()
         }
         findViewById<Button>(R.id.coordBtn).setOnClickListener { onSetZoneFromText() }
+        permBtn.setOnClickListener { openAppLocationSettings() }
 
         awakeBtn.setOnClickListener {
             awakeWanted = !awakeWanted
@@ -422,15 +425,27 @@ class MainActivity : AppCompatActivity() {
             radiusRow.addView(chip, lp)
         }
 
+        // Say plainly what the geofence is doing; silent failure was the whole
+        // problem before. status() is written by every registration attempt.
+        val needsPermission = zone != null && on && !GeofenceManager.hasBackgroundLocation(this)
+        permBtn.visibility = if (needsPermission) View.VISIBLE else View.GONE
+
         zoneInfo.text = when {
             zone == null ->
                 "No zone yet — park where you dump, pick a size, and set it. " +
                     "Every drive into the circle then counts a load, even with the screen off."
             !on -> radiusLabel(zone.optInt("r")) + " circle · auto counting is off"
-            !GeofenceManager.hasBackgroundLocation(this) ->
-                radiusLabel(zone.optInt("r")) + " circle · needs location set to " +
-                    "\"Allow all the time\" to count in the background"
-            else -> radiusLabel(zone.optInt("r")) + " circle · watching for arrivals"
+            needsPermission ->
+                radiusLabel(zone.optInt("r")) + " circle · NOT COUNTING — Android needs " +
+                    "location set to \"Allow all the time\" for this app. Tap the button below."
+            else -> {
+                val s = GeofenceManager.status(this)
+                val last = GeofenceManager.lastAutoCount(this)
+                val when_ = if (last > 0L) "\nLast auto count: " + fmtTime(last) else
+                    "\nNo auto count yet."
+                radiusLabel(zone.optInt("r")) + " circle · " +
+                    (if (s.isEmpty()) "registering…" else s) + when_
+            }
         }
     }
 
@@ -511,8 +526,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Android requires the "Allow all the time" grant to be asked for separately,
-     * and only after foreground location is already granted.
+     * "Allow all the time" is asked for separately from normal location access.
+     * From Android 11 it cannot be granted from an in-app prompt at all — the
+     * only route is the app's settings page — so send the user straight there.
      */
     private fun askBackgroundIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || GeofenceManager.hasBackgroundLocation(this)) {
@@ -520,18 +536,33 @@ class MainActivity : AppCompatActivity() {
             render()
             return
         }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            askBackground.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            return
+        }
         AlertDialog.Builder(this)
             .setTitle("Count loads with the screen off")
             .setMessage(
                 "To count a load when you drive into the dump zone with the app closed, " +
-                    "Android needs location set to \"Allow all the time\".\n\n" +
-                    "On the next screen choose Allow all the time."
+                    "Android needs this app's location set to \"Allow all the time\".\n\n" +
+                    "Android only allows that from Settings:\n\n" +
+                    "Permissions → Location → Allow all the time"
             )
-            .setPositiveButton("Continue") { _, _ ->
-                askBackground.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            }
+            .setPositiveButton("Open settings") { _, _ -> openAppLocationSettings() }
             .setNegativeButton("Not now", null)
             .show()
+    }
+
+    private fun openAppLocationSettings() {
+        val intent = Intent(
+            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            startActivity(Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+        }
     }
 
     // ---- jobs ---------------------------------------------------------------
