@@ -62,8 +62,8 @@
   #dim{position:fixed; inset:0; z-index:99; background:#000; display:flex; flex-direction:column;
        align-items:center; justify-content:center; gap:10px; cursor:pointer;}
   #dim[hidden]{display:none;}
-  #dimCount{font:600 34vmin/1 var(--mono); font-variant-numeric:tabular-nums; color:#41464d;}
-  #dimClock{font:500 26px/1 var(--mono); color:#33383e;}
+  #dimCount{font:600 62vmin/1 var(--mono); font-variant-numeric:tabular-nums; color:#4a5058;}
+  #dimClock{font:500 10vmin/1 var(--mono); font-variant-numeric:tabular-nums; color:#3a4046;}
   #dimHint{font:600 11px/1 var(--sans); letter-spacing:.14em; color:#26292d;}
 
   #jobRow{display:flex; align-items:center; gap:8px;}
@@ -547,7 +547,11 @@
     dimBtn.innerHTML = dimWanted ? "DIM<br>IN 10s" : "AUTO<br>DIM";
   }
   function updateDimReadout(){
-    $("dimCount").textContent = dayCount(activeJob(), todayKey());
+    const n = dayCount(activeJob(), todayKey());
+    const el = $("dimCount");
+    el.textContent = n;
+    // as big as fits: shrink per extra digit so 2-3 digit counts stay on screen
+    el.style.fontSize = (n >= 100 ? 36 : n >= 10 ? 50 : 62) + "vmin";
   }
   function armDim(){
     clearTimeout(dimTimer);
