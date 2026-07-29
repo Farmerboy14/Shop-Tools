@@ -51,11 +51,20 @@
   #clockTime{font:600 clamp(40px,13vw,56px)/1 var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
   #clockTime small{font-size:.45em; font-weight:500; color:var(--muted); margin-left:4px;}
   #clockDate{font:500 13px/1.3 var(--sans); color:var(--muted); margin-top:4px;}
-  #awakeBtn{margin-left:auto; font:700 11px/1.35 var(--sans); letter-spacing:.08em; padding:11px 12px;
+  #awakeBtn, #dimBtn{font:700 11px/1.35 var(--sans); letter-spacing:.08em; padding:11px 12px;
             border-radius:6px; border:1.5px solid var(--line); background:var(--panel); color:var(--muted);
             cursor:pointer; text-align:center;}
-  #awakeBtn:active{transform:translateY(1px); background:var(--panel2);}
-  #awakeBtn.on{border-color:var(--good); color:var(--good);}
+  #awakeBtn{margin-left:auto;}
+  #awakeBtn:active, #dimBtn:active{transform:translateY(1px); background:var(--panel2);}
+  #awakeBtn.on, #dimBtn.on{border-color:var(--good); color:var(--good);}
+
+  /* near-black idle screen: OLED pixels off = minimal battery */
+  #dim{position:fixed; inset:0; z-index:99; background:#000; display:flex; flex-direction:column;
+       align-items:center; justify-content:center; gap:10px; cursor:pointer;}
+  #dim[hidden]{display:none;}
+  #dimCount{font:600 34vmin/1 var(--mono); font-variant-numeric:tabular-nums; color:#41464d;}
+  #dimClock{font:500 26px/1 var(--mono); color:#33383e;}
+  #dimHint{font:600 11px/1 var(--sans); letter-spacing:.14em; color:#26292d;}
 
   #jobRow{display:flex; align-items:center; gap:8px;}
   #jobName{font:700 18px/1.2 var(--sans); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -166,6 +175,7 @@
       <div id="clockDate"></div>
     </div>
     <button id="awakeBtn" type="button">KEEP<br>SCREEN ON</button>
+    <button id="dimBtn" type="button">AUTO<br>DIM</button>
   </div>
 
   <div class="card">
@@ -210,6 +220,12 @@
   </div>
 
   <footer>Counts save on this phone automatically</footer>
+</div>
+
+<div id="dim" hidden>
+  <div id="dimCount">0</div>
+  <div id="dimClock"></div>
+  <div id="dimHint">LOADS TODAY · TAP TO WAKE</div>
 </div>
 
 <script>
@@ -382,6 +398,7 @@
     renderJobs();
     renderZone();
     syncWatch();
+    if (!dimEl.hidden) updateDimReadout();
   }
 
   function renderJobs(){
@@ -455,18 +472,22 @@
     save(); render();
   });
 
-  // ---- clock ----
+  // ---- clock (updates once a minute — display has no seconds) ----
   function tickClock(){
     const now = new Date();
     let h = now.getHours();
     const ampm = h >= 12 ? "PM" : "AM";
     h = h % 12 || 12;
-    $("clockTime").innerHTML = h + ":" + pad(now.getMinutes()) + "<small>" + ampm + "</small>";
+    const t = h + ":" + pad(now.getMinutes());
+    $("clockTime").innerHTML = t + "<small>" + ampm + "</small>";
     $("clockDate").textContent = now.toLocaleDateString(undefined,
       {weekday:"long", month:"long", day:"numeric"});
+    $("dimClock").textContent = t + " " + ampm;
   }
-  setInterval(tickClock, 1000);
-  tickClock();
+  (function clockLoop(){
+    tickClock();
+    setTimeout(clockLoop, 60000 - (Date.now() % 60000) + 250);
+  })();
 
   // ---- keep screen on (wake lock) ----
   const AWAKE_KEY = "silage-loads-awake";
@@ -502,14 +523,56 @@
     awakeBtn.style.display = "none";
   }
 
+  // ---- auto-dim: near-black idle screen to save battery on the dash ----
+  const DIM_KEY = "silage-loads-dim";
+  const DIM_IDLE_MS = 30000;
+  const dimEl = $("dim"), dimBtn = $("dimBtn");
+  let dimWanted = false;
+  try { dimWanted = localStorage.getItem(DIM_KEY) === "1"; } catch(e){}
+  let dimTimer = null;
+
+  function paintDim(){
+    dimBtn.classList.toggle("on", dimWanted);
+    dimBtn.innerHTML = dimWanted ? "DIM<br>IN 30s" : "AUTO<br>DIM";
+  }
+  function updateDimReadout(){
+    $("dimCount").textContent = dayCount(activeJob(), todayKey());
+  }
+  function armDim(){
+    clearTimeout(dimTimer);
+    if (dimWanted && !document.hidden) dimTimer = setTimeout(showDim, DIM_IDLE_MS);
+  }
+  function showDim(){
+    if (!dimWanted || document.hidden) return;
+    updateDimReadout(); tickClock();
+    dimEl.hidden = false;
+  }
+  function hideDim(){ dimEl.hidden = true; armDim(); }
+  function setDim(on){
+    dimWanted = on;
+    try { localStorage.setItem(DIM_KEY, on ? "1" : "0"); } catch(e){}
+    if (!on) dimEl.hidden = true;
+    paintDim(); armDim();
+  }
+  dimBtn.addEventListener("click", () => setDim(!dimWanted));
+  window.__silageDim = { show: showDim };   // test hook: skip the 30 s idle wait
+  dimEl.addEventListener("pointerdown", e => { e.stopPropagation(); hideDim(); });
+  document.addEventListener("pointerdown", () => armDim(), true);
+  paintDim(); armDim();
+
   // ---- auto count: circular dump zone, counts on entry ----
   const RADII = [
     { label:"300 FT", m:91 }, { label:"500 FT", m:152 },
     { label:"1000 FT", m:305 }, { label:"¼ MI", m:402 }
   ];
   let pendingR = 152;                       // radius chosen before a zone exists
-  let watchId = null, watchJobId = null;
+  let watchId = null, watchJobId = null, pollTimer = null;
+  let gpsMode = "off";                      // off | watch (continuous) | poll (battery saver)
+  let pollDelay = 0;                        // current poll interval, for the status line
   let armed = false, lastAutoT = 0, lastFix = null;
+  // Continuous high-accuracy GPS only when near the zone; coarse duty-cycled
+  // checks otherwise. A truck can't cross NEAR_M faster than the poll interval.
+  const NEAR_M = 1200, MAX_SPEED = 25;      // meters, m/s (~55 mph)
 
   function distM(lat1, lng1, lat2, lng2){
     const rad = x => x * Math.PI / 180;
@@ -532,6 +595,29 @@
     if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
   }
 
+  function startContinuous(){
+    if (pollTimer){ clearTimeout(pollTimer); pollTimer = null; }
+    if (watchId == null){
+      watchId = navigator.geolocation.watchPosition(onFix, () => {},
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    }
+    gpsMode = "watch";
+  }
+
+  function startPoll(delay){
+    if (watchId != null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+    gpsMode = "poll"; pollDelay = delay;
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(pollFix, delay);
+  }
+
+  function pollFix(){
+    // Coarse fix is enough for scheduling far from the zone, and much cheaper.
+    navigator.geolocation.getCurrentPosition(onFix,
+      () => { if (gpsMode === "poll") startPoll(30000); },
+      { enableHighAccuracy: false, maximumAge: 15000, timeout: 25000 });
+  }
+
   function onFix(pos){
     lastFix = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     const job = activeJob();
@@ -539,33 +625,45 @@
     if (!z || !z.auto) return;
     if (job.id !== watchJobId){ watchJobId = job.id; armed = false; }
     const d = distM(lastFix.lat, lastFix.lng, z.lat, z.lng);
+    let counted = false;
     if (d <= z.r){
       // Count only on entry: must have been armed (i.e. genuinely outside) first,
       // with a cooldown so one entry can't double-fire.
       if (armed && Date.now() - lastAutoT > 60000){
         lastAutoT = Date.now(); armed = false;
         autoCount(lastFix.lat, lastFix.lng);
-        return;                              // autoCount already re-rendered
+        counted = true;
       }
       armed = false;
     } else if (d > z.r + Math.max(60, z.r * 0.5)){
       armed = true;                          // clear of the jitter band — re-arm
     }
-    renderZone();
+    // Pick the cheapest GPS mode that can't miss the next entry.
+    const dOut = d - z.r;
+    if (dOut <= NEAR_M) startContinuous();
+    else startPoll(Math.min(120000, Math.max(20000, (dOut / MAX_SPEED) * 0.4 * 1000)));
+    if (!counted) renderZone();              // autoCount already re-rendered
   }
 
   function syncWatch(){
     const z = activeJob().zone;
     const want = !!(z && z.auto) && !document.hidden && "geolocation" in navigator;
-    if (want && watchId == null){
+    if (want && gpsMode === "off"){
       armed = false; lastFix = null; watchJobId = activeJob().id;
-      watchId = navigator.geolocation.watchPosition(onFix, () => {},
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
-    } else if (!want && watchId != null){
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
+      startContinuous();                     // one precise fix, then onFix picks the mode
+    } else if (!want && gpsMode !== "off"){
+      if (watchId != null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+      if (pollTimer){ clearTimeout(pollTimer); pollTimer = null; }
+      gpsMode = "off";
     }
   }
+
+  // test hook: lets automated tests inspect the GPS state and skip poll waits
+  window.__silageZone = {
+    mode: () => gpsMode,
+    debug: () => ({ gpsMode, armed, lastFix, lastAutoT, now: Date.now() }),
+    pollNow: () => { if (gpsMode === "poll"){ clearTimeout(pollTimer); pollFix(); } }
+  };
 
   function renderZone(){
     const job = activeJob();
@@ -603,6 +701,8 @@
         const d = distM(lastFix.lat, lastFix.lng, z.lat, z.lng);
         status = d <= z.r ? "in the zone now"
                : fmtDist(d) + " out · " + (armed ? "ready to count next entry" : "leave a bit further to arm");
+        if (gpsMode === "poll")
+          status += " · GPS napping " + Math.round(pollDelay/1000) + "s (battery saver)";
       }
       info.innerHTML = "<b>" + radLabel(z.r) + "</b> circle · " +
         '<a target="_blank" rel="noopener" href="https://maps.google.com/?q=' + z.lat + "," + z.lng + '">MAP 📍</a>' +
