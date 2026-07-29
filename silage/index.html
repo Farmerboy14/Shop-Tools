@@ -95,6 +95,18 @@
            text-decoration:none; border:1.5px solid var(--accent); border-radius:5px; padding:7px 9px;}
   .noloc{font-size:12px; color:var(--muted);}
   .muted-line{color:var(--muted); font-size:13px;}
+  .autotag{font:700 10px/1 var(--sans); letter-spacing:.08em; color:var(--good);
+           border:1px solid var(--good); border-radius:4px; padding:3px 5px;}
+
+  /* ---------- AUTO COUNT / DUMP ZONE ---------- */
+  #autoBtn.on{border-color:var(--good); color:var(--good);}
+  .zoneinfo{font:400 13px/1.6 var(--sans); color:var(--muted); margin:10px 0 2px; min-height:20px;}
+  .zoneinfo b{color:var(--ink);}
+  .zoneinfo a{color:var(--accent); font-weight:700; text-decoration:none;}
+  .chiprow{display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 2px;}
+  .rchip{font:600 12px/1 var(--mono); padding:10px 11px; border:1.5px solid var(--line);
+         border-radius:6px; background:var(--panel); color:var(--ink); cursor:pointer;}
+  .rchip.on{border-color:var(--accent); color:var(--accent);}
   .hrow b{font:600 22px/1 var(--mono); font-variant-numeric:tabular-nums; min-width:44px; text-align:right;}
   .mini{font:700 18px/1 var(--mono); width:40px; height:40px; border-radius:6px; cursor:pointer;
         border:1.5px solid var(--line); background:var(--panel); color:var(--ink);}
@@ -172,6 +184,19 @@
     <div id="lastLoad"></div>
     <button id="bigBtn" type="button">+ LOAD HAULED</button>
     <button id="undoBtn" type="button">− UNDO LAST LOAD</button>
+  </div>
+
+  <div class="card" id="autoCard">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div class="lbl" style="flex:1;">Auto count · dump zone</div>
+      <button class="hbtn" id="autoBtn" type="button">AUTO OFF</button>
+    </div>
+    <div class="zoneinfo" id="zoneInfo"></div>
+    <div class="chiprow" id="radiusRow"></div>
+    <div class="prow">
+      <button class="hbtn" id="zoneSetBtn" type="button">SET ZONE AT MY SPOT</button>
+      <button class="hbtn" id="zoneClearBtn" type="button">CLEAR</button>
+    </div>
   </div>
 
   <div class="statgrid">
@@ -347,7 +372,7 @@
               l.lat + "," + l.lng + '">MAP 📍</a>'
             : '<span class="noloc">no location</span>';
           line.innerHTML = "<span class='ln'>#" + (i+1) + "</span><span class='lt'>" +
-            fmtTime(l.t) + "</span>" + where;
+            fmtTime(l.t) + "</span>" + (l.auto ? "<span class='autotag'>AUTO</span>" : "") + where;
           det.appendChild(line);
         });
         hist.appendChild(det);
@@ -355,6 +380,8 @@
     }
 
     renderJobs();
+    renderZone();
+    syncWatch();
   }
 
   function renderJobs(){
@@ -474,6 +501,151 @@
   } else {
     awakeBtn.style.display = "none";
   }
+
+  // ---- auto count: circular dump zone, counts on entry ----
+  const RADII = [
+    { label:"300 FT", m:91 }, { label:"500 FT", m:152 },
+    { label:"1000 FT", m:305 }, { label:"¼ MI", m:402 }
+  ];
+  let pendingR = 152;                       // radius chosen before a zone exists
+  let watchId = null, watchJobId = null;
+  let armed = false, lastAutoT = 0, lastFix = null;
+
+  function distM(lat1, lng1, lat2, lng2){
+    const rad = x => x * Math.PI / 180;
+    const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng/2)**2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  const fmtDist = m => m < 305 ? Math.round(m*3.28084) + " ft" : (m/1609.34).toFixed(1) + " mi";
+  const radLabel = m => (RADII.find(r => r.m === m) || {label: Math.round(m*3.28084) + " ft"}).label;
+
+  function autoCount(lat, lng){
+    state = load();
+    const job = activeJob();
+    const k = todayKey();
+    const day = job.days[k] || (job.days[k] = { count: 0, loads: [] });
+    day.count++;
+    day.loads.push({ t: Date.now(), lat: +lat.toFixed(5), lng: +lng.toFixed(5), auto: true });
+    save(); render();
+    if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
+  }
+
+  function onFix(pos){
+    lastFix = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    const job = activeJob();
+    const z = job.zone;
+    if (!z || !z.auto) return;
+    if (job.id !== watchJobId){ watchJobId = job.id; armed = false; }
+    const d = distM(lastFix.lat, lastFix.lng, z.lat, z.lng);
+    if (d <= z.r){
+      // Count only on entry: must have been armed (i.e. genuinely outside) first,
+      // with a cooldown so one entry can't double-fire.
+      if (armed && Date.now() - lastAutoT > 60000){
+        lastAutoT = Date.now(); armed = false;
+        autoCount(lastFix.lat, lastFix.lng);
+        return;                              // autoCount already re-rendered
+      }
+      armed = false;
+    } else if (d > z.r + Math.max(60, z.r * 0.5)){
+      armed = true;                          // clear of the jitter band — re-arm
+    }
+    renderZone();
+  }
+
+  function syncWatch(){
+    const z = activeJob().zone;
+    const want = !!(z && z.auto) && !document.hidden && "geolocation" in navigator;
+    if (want && watchId == null){
+      armed = false; lastFix = null; watchJobId = activeJob().id;
+      watchId = navigator.geolocation.watchPosition(onFix, () => {},
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    } else if (!want && watchId != null){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+  }
+
+  function renderZone(){
+    const job = activeJob();
+    const z = job.zone;
+    const autoBtn = $("autoBtn");
+    autoBtn.textContent = z && z.auto ? "AUTO ON" : "AUTO OFF";
+    autoBtn.classList.toggle("on", !!(z && z.auto));
+    $("zoneSetBtn").textContent = z ? "MOVE ZONE TO MY SPOT" : "SET ZONE AT MY SPOT";
+    $("zoneClearBtn").style.display = z ? "" : "none";
+
+    const row = $("radiusRow");
+    row.innerHTML = "";
+    const cur = z ? z.r : pendingR;
+    for (const r of RADII){
+      const c = document.createElement("button");
+      c.type = "button"; c.className = "rchip" + (r.m === cur ? " on" : "");
+      c.textContent = r.label;
+      c.addEventListener("click", () => {
+        if (z){ state = load(); activeJob().zone.r = r.m; save(); }
+        else pendingR = r.m;
+        renderZone();
+      });
+      row.appendChild(c);
+    }
+
+    const info = $("zoneInfo");
+    if (!z){
+      info.innerHTML = "No zone yet — park where you dump, pick a size, and set it. " +
+        "Every drive into the circle then counts a load (app must be on screen).";
+    } else {
+      let status;
+      if (!z.auto) status = "auto counting is off";
+      else if (!lastFix) status = "getting GPS…";
+      else {
+        const d = distM(lastFix.lat, lastFix.lng, z.lat, z.lng);
+        status = d <= z.r ? "in the zone now"
+               : fmtDist(d) + " out · " + (armed ? "ready to count next entry" : "leave a bit further to arm");
+      }
+      info.innerHTML = "<b>" + radLabel(z.r) + "</b> circle · " +
+        '<a target="_blank" rel="noopener" href="https://maps.google.com/?q=' + z.lat + "," + z.lng + '">MAP 📍</a>' +
+        " — " + status;
+    }
+  }
+
+  $("autoBtn").addEventListener("click", () => {
+    state = load();
+    const job = activeJob();
+    if (!job.zone){
+      $("zoneInfo").innerHTML = "<b>Set a zone first</b> — park at the pit and tap SET ZONE AT MY SPOT.";
+      return;
+    }
+    job.zone.auto = !job.zone.auto;
+    if (job.zone.auto){
+      awakeWanted = true;
+      try { localStorage.setItem(AWAKE_KEY, "1"); } catch(e){}
+      acquireAwake();
+    }
+    save(); render();
+  });
+
+  $("zoneSetBtn").addEventListener("click", () => {
+    if (!navigator.geolocation){ $("zoneInfo").textContent = "No GPS available on this device."; return; }
+    $("zoneInfo").textContent = "Getting your position…";
+    navigator.geolocation.getCurrentPosition(pos => {
+      state = load();
+      const job = activeJob();
+      const keepAuto = job.zone ? job.zone.auto : false;
+      job.zone = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5),
+                   r: job.zone ? job.zone.r : pendingR, auto: keepAuto };
+      save(); render();
+    }, () => {
+      $("zoneInfo").innerHTML = "<b>Couldn't get GPS.</b> Check location permission and try again.";
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+  });
+
+  $("zoneClearBtn").addEventListener("click", () => {
+    state = load();
+    activeJob().zone = null;
+    save(); render();
+  });
 
   // Live-sync when the widget view changes the count in another tab/window.
   window.addEventListener("storage", e => {
