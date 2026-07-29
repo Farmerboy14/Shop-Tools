@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   apk:
@@ -37,3 +37,16 @@ jobs:
           name: silage-loads-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # Artifacts need a GitHub login to download, which the other drivers
+      # won't have. A release asset is a plain public link they can tap.
+      - name: Publish to the "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk silage-loads.apk
+          gh release view latest >/dev/null 2>&1 || gh release create latest \
+            --title "Silage Loads — latest build" \
+            --notes "Install on Android: tap the .apk below, then allow installs from your browser when asked. Installing over an existing copy keeps your loads." \
+            --prerelease
+          gh release upload latest silage-loads.apk --clobber
