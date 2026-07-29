@@ -81,8 +81,20 @@
   #histList{display:flex; flex-direction:column; gap:6px; margin-top:10px;}
   .hrow{display:flex; align-items:center; gap:8px; padding:10px 12px; border:1.5px solid var(--line);
         border-radius:6px; background:var(--panel2);}
-  .hrow .d{flex:1; font:500 14px/1.2 var(--sans);}
+  .hrow .d{flex:1; font:500 14px/1.2 var(--sans); cursor:pointer;}
   .hrow .d small{display:block; color:var(--muted); font-size:11px; margin-top:2px;}
+  .hrow .caret{color:var(--muted); font-size:11px;}
+  .hdetail{border:1.5px solid var(--line); border-top:none; border-radius:0 0 6px 6px;
+           background:var(--panel); padding:4px 12px 8px; margin-top:-8px;}
+  .load-line{display:flex; align-items:center; gap:12px; padding:8px 0;
+             border-bottom:1px solid var(--line); font:400 14px/1.2 var(--sans);}
+  .load-line:last-child{border-bottom:none;}
+  .load-line .ln{font:600 13px/1 var(--mono); color:var(--muted); min-width:30px;}
+  .load-line .lt{flex:1; font:500 15px/1 var(--mono); font-variant-numeric:tabular-nums;}
+  .maplink{font:700 12px/1 var(--sans); letter-spacing:.06em; color:var(--accent);
+           text-decoration:none; border:1.5px solid var(--accent); border-radius:5px; padding:7px 9px;}
+  .noloc{font-size:12px; color:var(--muted);}
+  .muted-line{color:var(--muted); font-size:13px;}
   .hrow b{font:600 22px/1 var(--mono); font-variant-numeric:tabular-nums; min-width:44px; text-align:right;}
   .mini{font:700 18px/1 var(--mono); width:40px; height:40px; border-radius:6px; cursor:pointer;
         border:1.5px solid var(--line); background:var(--panel); color:var(--ink);}
@@ -192,6 +204,9 @@
   const todayKey = () => dateKey(new Date());
   const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate()-1); return dateKey(d); };
 
+  const fmtTime = t => new Date(t).toLocaleTimeString(undefined, {hour:"numeric", minute:"2-digit"});
+  const expandedDays = new Set();
+
   function niceDate(key){
     const [y,m,d] = key.split("-").map(Number);
     const dt = new Date(y, m-1, d);
@@ -202,18 +217,29 @@
     return { id: "j" + Math.random().toString(36).slice(2,9), name, created: todayKey(), days: {} };
   }
 
+  // Older versions stored plain timestamps in day.times; now each load is
+  // a record {t, lat, lng} in day.loads.
+  function migrate(s){
+    for (const j of s.jobs) for (const k in j.days){
+      const d = j.days[k];
+      if (!d.loads) d.loads = (d.times || []).map(t => ({ t }));
+      delete d.times;
+    }
+    return s;
+  }
+
   function load(){
     const raw = store.get();
     if (raw){
       try {
         const s = JSON.parse(raw);
-        if (s && Array.isArray(s.jobs) && s.jobs.length) return s;
+        if (s && Array.isArray(s.jobs) && s.jobs.length) return migrate(s);
       } catch(e){}
     }
     // First run: seed with 10 loads hauled on Jul 27, 2026.
     const job = newJob("Job 1");
     job.created = "2026-07-27";
-    job.days["2026-07-27"] = { count: 10, times: [] };
+    job.days["2026-07-27"] = { count: 10, loads: [] };
     const s = { jobs: [job], active: job.id };
     store.set(JSON.stringify(s));
     return s;
@@ -229,12 +255,31 @@
     // Re-read storage first so a count added from the widget view isn't clobbered.
     state = load();
     const job = state.jobs.find(j => j.id === jobId) || activeJob();
-    const day = job.days[key] || (job.days[key] = { count: 0, times: [] });
+    const day = job.days[key] || (job.days[key] = { count: 0, loads: [] });
     day.count = Math.max(0, day.count + delta);
-    if (delta > 0 && logTime) day.times.push(Date.now());
-    else if (delta < 0 && day.times.length) day.times.pop();
+    if (delta > 0 && logTime){
+      const t = Date.now();
+      day.loads.push({ t });
+      geoStamp(job.id, key, t);
+    } else if (delta < 0 && day.loads.length) day.loads.pop();
     if (day.count === 0 && key !== todayKey()) delete job.days[key];
     save(); render();
+  }
+
+  // Attach GPS coords to a just-logged load once the fix arrives.
+  function geoStamp(jobId, key, t){
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      state = load();
+      const job = state.jobs.find(j => j.id === jobId);
+      const day = job && job.days[key];
+      const entry = day && day.loads.find(l => l.t === t);
+      if (entry){
+        entry.lat = +pos.coords.latitude.toFixed(5);
+        entry.lng = +pos.coords.longitude.toFixed(5);
+        save(); render();
+      }
+    }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
   }
 
   const $ = id => document.getElementById(id);
@@ -251,12 +296,13 @@
     $("yestCount").textContent = dayCount(job, yk);
     $("jobTotal").textContent = jobTotal(job);
 
-    const times = (job.days[tk] && job.days[tk].times) || [];
-    $("lastLoad").textContent = times.length
-      ? "last load " + new Date(times[times.length-1]).toLocaleTimeString(undefined, {hour:"numeric", minute:"2-digit"})
+    const loads = (job.days[tk] && job.days[tk].loads) || [];
+    $("lastLoad").textContent = loads.length
+      ? "last load " + fmtTime(loads[loads.length-1].t)
       : "";
 
-    // History, newest first. +/− on each row so a missed load can be fixed later.
+    // History, newest first. +/− on each row so a missed load can be fixed
+    // later; tapping the date expands the load-by-load log (time + map pin).
     const hist = $("histList");
     hist.innerHTML = "";
     const keys = Object.keys(job.days).filter(k => dayCount(job,k) > 0 || k === tk).sort().reverse();
@@ -267,9 +313,15 @@
       const row = document.createElement("div");
       row.className = "hrow";
       const label = k === tk ? "Today" : (k === yk ? "Yesterday" : "");
+      const isOpen = expandedDays.has(k);
       row.innerHTML =
-        '<div class="d">' + niceDate(k) + (label ? "<small>" + label + "</small>" : "") + "</div>" +
+        '<div class="d">' + niceDate(k) + " <span class='caret'>" + (isOpen ? "▾" : "▸") + "</span>" +
+        (label ? "<small>" + label + "</small>" : "") + "</div>" +
         "<b>" + dayCount(job,k) + "</b>";
+      row.querySelector(".d").addEventListener("click", () => {
+        isOpen ? expandedDays.delete(k) : expandedDays.add(k);
+        render();
+      });
       const minus = document.createElement("button");
       minus.type = "button"; minus.className = "mini"; minus.textContent = "−";
       minus.addEventListener("click", () => bump(job.id, k, -1, false));
@@ -278,6 +330,28 @@
       plus.addEventListener("click", () => bump(job.id, k, +1, false));
       row.appendChild(minus); row.appendChild(plus);
       hist.appendChild(row);
+
+      if (isOpen){
+        const det = document.createElement("div");
+        det.className = "hdetail";
+        const dLoads = (job.days[k] && job.days[k].loads) || [];
+        if (!dLoads.length){
+          det.innerHTML = '<div class="load-line muted-line">No stamped loads this day' +
+            (dayCount(job,k) ? " (count was set by hand)" : "") + "</div>";
+        }
+        dLoads.forEach((l, i) => {
+          const line = document.createElement("div");
+          line.className = "load-line";
+          const where = (l.lat != null && l.lng != null)
+            ? '<a class="maplink" target="_blank" rel="noopener" href="https://maps.google.com/?q=' +
+              l.lat + "," + l.lng + '">MAP 📍</a>'
+            : '<span class="noloc">no location</span>';
+          line.innerHTML = "<span class='ln'>#" + (i+1) + "</span><span class='lt'>" +
+            fmtTime(l.t) + "</span>" + where;
+          det.appendChild(line);
+        });
+        hist.appendChild(det);
+      }
     }
 
     renderJobs();

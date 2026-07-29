@@ -1,4 +1,4 @@
-const CACHE = "silage-loads-v2";
+const CACHE = "silage-loads-v3";
 const ASSETS = ["./", "./index.html", "./widget.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
