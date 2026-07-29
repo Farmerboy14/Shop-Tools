@@ -155,8 +155,9 @@
   }
 
   /* ---------- TABBAR ---------- */
-  #tabbar{display:grid; grid-template-columns:repeat(4,1fr); border-top:1.5px solid var(--line);
+  #tabbar{display:grid; grid-template-columns:repeat(5,1fr); border-top:1.5px solid var(--line);
           background:var(--panel); padding-bottom:env(safe-area-inset-bottom);}
+  a.tab{text-decoration:none; display:block;}
   .tab{font:700 12px/1 var(--sans); letter-spacing:.12em; padding:17px 0 15px; text-align:center;
        color:var(--muted); border:0; border-top:2px solid transparent; background:none; cursor:pointer;}
   .tab.active{color:var(--accent); border-top-color:var(--accent);}
@@ -353,6 +354,7 @@
     <button class="tab" data-v="ruler">RULER</button>
     <button class="tab" data-v="calc">CALC</button>
     <button class="tab" data-v="data">DATA</button>
+    <a class="tab" href="silage/">SILAGE</a>
   </nav>
 </div>
 
@@ -409,7 +411,7 @@ function toast(msg,ms){ const t=$("toast"); t.textContent=msg; t.hidden=false;
   clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, ms||2600); }
 
 /* ============================= TABS ============================= */
-const tabs=[...document.querySelectorAll(".tab")];
+const tabs=[...document.querySelectorAll(".tab[data-v]")];
 tabs.forEach(b=>b.addEventListener("click",()=>{
   tabs.forEach(x=>x.classList.toggle("active",x===b));
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
