@@ -13,6 +13,7 @@ class BootReceiver : BroadcastReceiver() {
             action == "android.intent.action.QUICKBOOT_POWERON"
         ) {
             GeofenceManager.sync(context)
+            ZoneWatchService.start(context)
             LoadWidget.refresh(context)
         }
     }

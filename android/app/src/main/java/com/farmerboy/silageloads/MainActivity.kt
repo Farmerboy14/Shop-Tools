@@ -209,6 +209,7 @@ class MainActivity : AppCompatActivity() {
         ui.removeCallbacks(clockTick)
         clockTick.run()
         GeofenceManager.sync(this)
+        ZoneWatchService.start(this)   // no-op unless a zone is set and auto is on
         render()
         armDim()
     }
@@ -442,14 +443,21 @@ class MainActivity : AppCompatActivity() {
                 radiusLabel(zone.optInt("r")) + " circle · NOT COUNTING — Android needs " +
                     "location set to \"Allow all the time\" for this app. Tap the button below."
             else -> {
-                val s = GeofenceManager.status(this)
-                val last = GeofenceManager.lastAutoCount(this)
-                val when_ = if (last > 0L) "\nLast auto count: " + fmtTime(last) else
-                    "\nNo auto count yet."
-                radiusLabel(zone.optInt("r")) + " circle · " +
-                    (if (s.isEmpty()) "registering…" else s) + when_
+                val last = AutoCounter.lastCount(this)
+                val lastLine = if (last > 0L) "\nLast auto count: " + fmtTime(last)
+                    else "\nNo auto count yet."
+                val battery = batteryWarning()
+                radiusLabel(zone.optInt("r")) + " circle · watching (see the " +
+                    "notification for live distance)" + lastLine + battery
             }
         }
+    }
+
+    private fun batteryWarning(): String {
+        val pm = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            ?: return ""
+        return if (pm.isIgnoringBatteryOptimizations(packageName)) ""
+        else "\n⚠ Battery saver may stop this — tap AUTO ON again to allow unrestricted running."
     }
 
     // ---- zone actions -------------------------------------------------------
@@ -464,12 +472,52 @@ class MainActivity : AppCompatActivity() {
         }
         val turningOn = !zone.optBoolean("auto")
         LoadStore.setAuto(this, turningOn)
-        if (turningOn && !GeofenceManager.hasBackgroundLocation(this)) {
-            requestLocation()
+        if (turningOn) {
+            // Assume you're at the pit when you switch it on, so the first
+            // count only happens after you've actually left and come back.
+            AutoCounter.setArmed(this, false)
+            if (!GeofenceManager.hasBackgroundLocation(this)) {
+                requestLocation()
+            } else {
+                GeofenceManager.sync(this)
+            }
+            ZoneWatchService.start(this)
+            askBatteryExemption()
         } else {
             GeofenceManager.sync(this)
+            ZoneWatchService.stop(this)
         }
         render()
+    }
+
+    /**
+     * Phone makers' battery savers are the usual reason background counting
+     * dies after a while. Ask once to be left alone.
+     */
+    private fun askBatteryExemption() {
+        val pm = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager ?: return
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        AlertDialog.Builder(this)
+            .setTitle("Keep counting in the background")
+            .setMessage(
+                "Android's battery saver can put this app to sleep, which stops loads " +
+                    "being counted at the dump zone.\n\nAllowing it to run unrestricted is " +
+                    "what keeps auto counting reliable through the day."
+            )
+            .setPositiveButton("Allow") { _, _ ->
+                try {
+                    startActivity(
+                        Intent(
+                            android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                } catch (_: Exception) {
+                    openAppLocationSettings()
+                }
+            }
+            .setNegativeButton("Not now", null)
+            .show()
     }
 
     private fun onSetZoneHere() {
