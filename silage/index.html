@@ -61,8 +61,10 @@
   #dim{position:fixed; inset:0; z-index:99; background:#000; display:flex; flex-direction:column;
        align-items:center; justify-content:center; gap:10px; cursor:pointer;}
   #dim[hidden]{display:none;}
-  #dimCount{font:600 62vmin/1 var(--mono); font-variant-numeric:tabular-nums; color:#5c5442;
-            letter-spacing:-.04em;}
+  /* --digits-size is set by JS (unitless); --dim-unit lets landscape rescale it */
+  #dimCount{--dim-unit:1vmin; font:600 1px/1 var(--mono); font-variant-numeric:tabular-nums;
+            font-size:calc(var(--digits-size, 62) * var(--dim-unit));
+            color:#5c5442; letter-spacing:-.04em;}
   #dimClock{font:600 17vmin/1 var(--mono); font-variant-numeric:tabular-nums; color:#6e6550;}
   #dimHint{font:600 11px/1 var(--sans); letter-spacing:.14em; color:#332f26;}
 
@@ -147,13 +149,43 @@
   .jobitem .tot{font:600 18px/1 var(--mono); color:var(--muted);}
   .danger{color:var(--warn); border-color:var(--warn);}
   footer{text-align:center; color:var(--muted); font-size:11px; letter-spacing:.06em;}
+
+  /* ---------- LANDSCAPE (phone on its side in the dash mount) ----------
+     Two columns so the count and the big button sit side by side and stay
+     on screen without scrolling; setup cards flow down the right. */
+  @media (orientation:landscape) and (max-height:600px){
+    #app{max-width:1000px; display:grid; grid-template-columns:1fr 1fr;
+         align-items:start; column-gap:12px; row-gap:10px;}
+    header, .panel.open{grid-column:1 / -1;}
+    /* clock and job side by side so the today card clears the fold */
+    #clockCard{grid-column:1; padding:10px 14px;}
+    #jobCard{grid-column:2;}
+    #clockTime{font-size:clamp(28px,6vw,42px);}
+
+    /* today card: count on the left, LOAD button filling the right */
+    #todayCard{grid-column:1 / -1; text-align:left;
+               display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);
+               column-gap:18px; align-items:center; padding:12px 14px;}
+    #todayLbl{grid-column:1; grid-row:1;}
+    #todayCount{grid-column:1; grid-row:2; font-size:clamp(56px,13vw,112px); margin:0;}
+    #lastLoad{grid-column:1; grid-row:3;}
+    #bigBtn{grid-column:2; grid-row:1 / span 3; margin-top:0; height:100%; min-height:104px;}
+    #undoBtn{grid-column:2; grid-row:4; margin-top:10px;}
+
+    .statgrid{grid-column:1 / -1;}
+
+    /* dim screen: count and clock side by side to use the width */
+    #dim{flex-direction:row; gap:5vmin; flex-wrap:wrap;}
+    #dimCount{--dim-unit:1.35vmin;}
+    #dimClock{font-size:20vmin;}
+    #dimHint{width:100%; text-align:center;}
+  }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
     <h1>Silage Loads</h1>
-    <a class="hbtn" id="widgetLink" href="widget.html" style="text-decoration:none;">BIG +/−</a>
     <button class="hbtn" id="jobsBtn" type="button">JOBS</button>
     <button class="hbtn primary" id="newJobBtn" type="button">+ NEW JOB</button>
   </header>
@@ -187,7 +219,7 @@
     <button id="dimBtn" type="button">AUTO<br>DIM</button>
   </div>
 
-  <div class="card">
+  <div class="card" id="jobCard">
     <div id="jobRow">
       <div style="flex:1; min-width:0;">
         <div class="lbl">Current job</div>
@@ -307,7 +339,7 @@
   const jobTotal = job => Object.values(job.days).reduce((a,d) => a + d.count, 0);
 
   function bump(jobId, key, delta, logTime){
-    // Re-read storage first so a count added from the widget view isn't clobbered.
+    // Re-read storage first so a count from another open tab isn't clobbered.
     state = load();
     const job = state.jobs.find(j => j.id === jobId) || activeJob();
     const day = job.days[key] || (job.days[key] = { count: 0, loads: [] });
@@ -553,8 +585,9 @@
     const n = dayCount(activeJob(), todayKey());
     const el = $("dimCount");
     el.textContent = n;
-    // as big as fits: shrink per extra digit so 2-3 digit counts stay on screen
-    el.style.fontSize = (n >= 100 ? 36 : n >= 10 ? 50 : 62) + "vmin";
+    // as big as fits: shrink per extra digit so 2-3 digit counts stay on screen.
+    // CSS turns this into a size, so landscape can scale it differently.
+    el.style.setProperty("--digits-size", n >= 100 ? 36 : n >= 10 ? 50 : 62);
   }
   function armDim(){
     clearTimeout(dimTimer);
@@ -794,7 +827,7 @@
   $("coordBtn").addEventListener("click", setZoneFromInput);
   $("coordInput").addEventListener("keydown", e => { if (e.key === "Enter") setZoneFromInput(); });
 
-  // Live-sync when the widget view changes the count in another tab/window.
+  // Live-sync when another open tab/window changes the count.
   window.addEventListener("storage", e => {
     if (e.key === KEY){ state = load(); render(); }
   });
