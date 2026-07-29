@@ -5,17 +5,9 @@
   "start_url": ".",
   "scope": ".",
   "display": "fullscreen",
-  "orientation": "portrait",
-  "background_color": "#131518",
-  "theme_color": "#131518",
-  "shortcuts": [
-    {
-      "name": "Quick counter",
-      "short_name": "Counter",
-      "url": "widget.html",
-      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
-    }
-  ],
+  "orientation": "any",
+  "background_color": "#16140e",
+  "theme_color": "#16140e",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
