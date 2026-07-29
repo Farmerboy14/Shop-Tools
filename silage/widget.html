@@ -4,24 +4,21 @@
 <meta charset="utf-8">
 <title>Loads — Quick Counter</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#131518">
+<meta name="theme-color" content="#16140e">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
+  /* Modern-farmer dark theme: soil charcoal, harvest amber. */
   :root{
-    --bg:#eef0ec; --panel:#ffffff; --ink:#191c1f; --muted:#5f666d; --line:#d3d6d0;
-    --accent:#c96a00; --accent-ink:#ffffff;
+    --bg:#16140e; --panel:#201d14; --ink:#f2ebdb; --muted:#a89f89; --line:#3d382a;
+    --accent:#ffb020; --accent2:#e08e07; --accent-ink:#211500;
     --mono:ui-monospace,"Roboto Mono","Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
     --sans:system-ui,"Roboto","Segoe UI",sans-serif;
   }
-  @media (prefers-color-scheme: dark){
-    :root{ --bg:#131518; --panel:#1c1f23; --ink:#e7eaed; --muted:#8f969e; --line:#31363c;
-           --accent:#ff9026; --accent-ink:#1a1002; }
-  }
-  :root[data-theme="dark"]{ --bg:#131518; --panel:#1c1f23; --ink:#e7eaed; --muted:#8f969e;
-           --line:#31363c; --accent:#ff9026; --accent-ink:#1a1002; }
-  :root[data-theme="light"]{ --bg:#eef0ec; --panel:#ffffff; --ink:#191c1f; --muted:#5f666d;
-           --line:#d3d6d0; --accent:#c96a00; --accent-ink:#ffffff; }
+  :root[data-theme="dark"]{ --bg:#16140e; --panel:#201d14; --ink:#f2ebdb; --muted:#a89f89;
+           --line:#3d382a; --accent:#ffb020; --accent2:#e08e07; --accent-ink:#211500; }
+  :root[data-theme="light"]{ --bg:#efede3; --panel:#fffdf6; --ink:#26221a; --muted:#6d6553;
+           --line:#d8d2bf; --accent:#c87f0a; --accent2:#a86504; --accent-ink:#fffdf6; }
   html,body{height:100%; margin:0; padding:0;}
   body{background:var(--bg); color:var(--ink); font-family:var(--sans); overscroll-behavior:none;
        -webkit-tap-highlight-color:transparent; touch-action:manipulation;
@@ -32,19 +29,20 @@
   #top{display:flex; align-items:center; gap:8px;}
   #job{flex:1; font:600 13px/1.3 var(--sans); letter-spacing:.06em; color:var(--muted);
        text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  #full{font:700 11px/1 var(--sans); letter-spacing:.08em; color:var(--muted);
-        border:1.5px solid var(--line); border-radius:6px; padding:9px 10px;
+  #full{font:800 11px/1 var(--sans); letter-spacing:.1em; color:var(--muted);
+        border:2px solid var(--line); border-radius:9px; padding:9px 10px;
         background:var(--panel); text-decoration:none;}
-  #count{font:600 clamp(110px,42vmin,240px)/1 var(--mono); font-variant-numeric:tabular-nums;
-         letter-spacing:-.03em; text-align:center; margin:2vh 0 1vh;}
+  #count{font:700 clamp(110px,42vmin,240px)/1 var(--mono); font-variant-numeric:tabular-nums;
+         letter-spacing:-.03em; text-align:center; margin:2vh 0 1vh; color:var(--accent);
+         text-shadow:0 0 30px rgba(255,176,32,.18);}
   #today{font:600 12px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase;
          color:var(--muted); text-align:center;}
-  #plus{flex:1; margin-top:2vh; border:none; border-radius:14px; cursor:pointer;
-        background:var(--accent); color:var(--accent-ink);
-        font:800 min(15vmin,72px)/1 var(--sans);}
-  #plus:active{transform:translateY(2px); filter:brightness(.92);}
-  #minus{margin-top:10px; padding:2.4vh 0; border-radius:10px; cursor:pointer;
-         border:1.5px solid var(--line); background:var(--panel); color:var(--muted);
+  #plus{flex:1; margin-top:2vh; border:none; border-radius:18px; cursor:pointer;
+        background:linear-gradient(180deg, var(--accent), var(--accent2)); color:var(--accent-ink);
+        font:900 min(15vmin,72px)/1 var(--sans); box-shadow:0 5px 0 rgba(0,0,0,.4);}
+  #plus:active{transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.4); filter:brightness(.94);}
+  #minus{margin-top:12px; padding:2.4vh 0; border-radius:12px; cursor:pointer;
+         border:2px solid var(--line); background:var(--panel); color:var(--muted);
          font:800 28px/1 var(--sans);}
   #minus:active{transform:translateY(1px);}
 </style>

@@ -6,8 +6,8 @@
   "scope": ".",
   "display": "fullscreen",
   "orientation": "portrait",
-  "background_color": "#131518",
-  "theme_color": "#131518",
+  "background_color": "#16140e",
+  "theme_color": "#16140e",
   "shortcuts": [
     {
       "name": "Quick counter",
