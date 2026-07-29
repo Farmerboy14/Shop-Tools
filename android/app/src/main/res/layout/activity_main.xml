@@ -36,6 +36,14 @@
                     android:letterSpacing="0.12" />
 
                 <Button
+                    android:id="@+id/mapBtn"
+                    style="@style/ChunkyButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="@string/map" />
+
+                <Button
                     android:id="@+id/jobsBtn"
                     style="@style/ChunkyButton"
                     android:layout_width="wrap_content"

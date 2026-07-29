@@ -23,6 +23,9 @@
     <string name="set">SET</string>
     <string name="coord_hint">or paste coordinates: 43.61234, -96.54321</string>
     <string name="fix_permission">FIX LOCATION PERMISSION →</string>
+    <string name="map">MAP</string>
+    <string name="close">CLOSE</string>
+    <string name="center_on_me">MY SPOT</string>
     <string name="history">HISTORY (THIS JOB)</string>
     <string name="loads_today_tap">LOADS TODAY · TAP TO WAKE</string>
     <string name="footer">Counts save on this phone automatically</string>

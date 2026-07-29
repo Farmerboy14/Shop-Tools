@@ -166,6 +166,9 @@ class MainActivity : AppCompatActivity() {
             LoadWidget.refresh(this)
             render()
         }
+        findViewById<Button>(R.id.mapBtn).setOnClickListener {
+            startActivity(Intent(this, MapActivity::class.java))
+        }
         findViewById<Button>(R.id.jobsBtn).setOnClickListener { showJobsDialog() }
         findViewById<Button>(R.id.newJobBtn).setOnClickListener { showNewJobDialog() }
 
