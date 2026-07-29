@@ -4,7 +4,7 @@
   "description": "Silage load tally counter — big tap button, today/yesterday/job totals, per-job trackers, dash clock.",
   "start_url": ".",
   "scope": ".",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#131518",
   "theme_color": "#131518",
