@@ -41,4 +41,6 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     // OpenStreetMap: no API key and no Google Maps account needed.
     implementation("org.osmdroid:osmdroid-android:6.1.18")
+    // Renders downloaded per-state offline map files (vector, full detail).
+    implementation("org.osmdroid:osmdroid-mapsforge:6.1.18")
 }

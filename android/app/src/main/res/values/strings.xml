@@ -26,6 +26,12 @@
     <string name="map">MAP</string>
     <string name="close">CLOSE</string>
     <string name="center_on_me">MY SPOT</string>
+    <string name="offline_btn">STATES</string>
+    <string name="offline_maps">Offline maps — pick your states</string>
+    <string name="offline_maps_hint">Downloaded states draw at full detail with no signal</string>
+    <string name="get_map">GET</string>
+    <string name="delete">DELETE</string>
+    <string name="cancel">CANCEL</string>
     <string name="history">HISTORY (THIS JOB)</string>
     <string name="loads_today_tap">LOADS TODAY · TAP TO WAKE</string>
     <string name="footer">Counts save on this phone automatically</string>

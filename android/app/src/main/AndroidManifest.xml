@@ -48,6 +48,13 @@
             android:screenOrientation="fullUser"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
 
+        <activity
+            android:name=".OfflineMapsActivity"
+            android:exported="false"
+            android:label="Offline maps"
+            android:screenOrientation="fullUser"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
         <service
             android:name=".ZoneWatchService"
             android:exported="false"

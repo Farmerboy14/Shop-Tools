@@ -1,5 +1,6 @@
 package com.farmerboy.silageloads
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.preference.PreferenceManager
@@ -7,7 +8,11 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.osmdroid.config.Configuration
+import org.osmdroid.mapsforge.MapsForgeTileProvider
+import org.osmdroid.mapsforge.MapsForgeTileSource
+import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.util.SimpleRegisterReceiver
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -28,9 +33,15 @@ import java.util.Locale
  */
 class MapActivity : AppCompatActivity() {
 
+    companion object {
+        private var forgeReady = false
+    }
+
     private lateinit var map: MapView
     private lateinit var info: TextView
     private var myLocation: MyLocationNewOverlay? = null
+    private var offlineFiles: List<String> = emptyList()
+    private var usingOffline = false
 
     private val timeFmt: DateTimeFormatter =
         DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
@@ -48,21 +59,57 @@ class MapActivity : AppCompatActivity() {
         map = findViewById(R.id.map)
         info = findViewById(R.id.mapInfo)
 
-        map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
         map.zoomController.setVisibility(
             org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
         )
+        setupTiles()
 
         findViewById<Button>(R.id.mapCloseBtn).setOnClickListener { finish() }
         findViewById<Button>(R.id.mapCenterBtn).setOnClickListener { centerOnMe() }
+        findViewById<Button>(R.id.mapOfflineBtn).setOnClickListener {
+            startActivity(Intent(this, OfflineMapsActivity::class.java))
+        }
 
         draw()
+    }
+
+    /**
+     * Downloaded state files render everything locally; with none, fall back
+     * to online OSM tiles (which still cache whatever you view).
+     */
+    private fun setupTiles() {
+        OfflineMaps.refresh(this)
+        val ready = OfflineMaps.readyFiles(this)
+        val names = ready.map { it.name }.sorted()
+        if (names == offlineFiles) return
+        offlineFiles = names
+
+        usingOffline = false
+        if (ready.isNotEmpty()) {
+            try {
+                if (!forgeReady) {
+                    MapsForgeTileSource.createInstance(application)
+                    forgeReady = true
+                }
+                val source = MapsForgeTileSource.createFromFiles(ready.toTypedArray())
+                map.tileProvider = MapsForgeTileProvider(SimpleRegisterReceiver(this), source, null)
+                usingOffline = true
+            } catch (_: Exception) {
+                // corrupt or unreadable file — fall through to online tiles
+            }
+        }
+        if (!usingOffline) {
+            map.tileProvider = MapTileProviderBasic(applicationContext)
+            map.setTileSource(TileSourceFactory.MAPNIK)
+        }
+        map.invalidate()
     }
 
     override fun onResume() {
         super.onResume()
         map.onResume()
+        setupTiles()
         draw()
     }
 
@@ -126,7 +173,7 @@ class MapActivity : AppCompatActivity() {
         val total = LoadStore.dayCount(job, today)
         info.text = job.optString("name", "Job") + " · " + total + " today · " +
             plotted + " with a location" +
-            (if (plotted < total) " (the rest were counted by hand)" else "")
+            (if (usingOffline) " · offline map" else "")
 
         // frame something sensible: the zone if set, else the newest load
         val focus = when {
