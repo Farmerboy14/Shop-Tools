@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Silage Loads</string>
+    <string name="widget_label">Silage Loads</string>
+    <string name="load_hauled">+ LOAD HAULED</string>
+    <string name="undo_last">− UNDO LAST LOAD</string>
+    <string name="jobs">JOBS</string>
+    <string name="new_job">+ NEW JOB</string>
+    <string name="keep_screen_on">KEEP\nSCREEN ON</string>
+    <string name="screen_staying_on">SCREEN\nSTAYING ON</string>
+    <string name="auto_dim">AUTO\nDIM</string>
+    <string name="dim_in_10">DIM\nIN 10s</string>
+    <string name="today">TODAY</string>
+    <string name="yesterday">YESTERDAY</string>
+    <string name="job_total">JOB TOTAL</string>
+    <string name="current_job">CURRENT JOB</string>
+    <string name="auto_count">AUTO COUNT · DUMP ZONE</string>
+    <string name="auto_on">AUTO ON</string>
+    <string name="auto_off">AUTO OFF</string>
+    <string name="set_zone">SET ZONE AT MY SPOT</string>
+    <string name="move_zone">MOVE ZONE TO MY SPOT</string>
+    <string name="clear">CLEAR</string>
+    <string name="set">SET</string>
+    <string name="coord_hint">or paste coordinates: 43.61234, -96.54321</string>
+    <string name="history">HISTORY (THIS JOB)</string>
+    <string name="loads_today_tap">LOADS TODAY · TAP TO WAKE</string>
+    <string name="footer">Counts save on this phone automatically</string>
+</resources>

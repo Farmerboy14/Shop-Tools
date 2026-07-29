@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tally marks kept inside the 72dp safe zone of the 108dp adaptive canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group>
+        <path android:fillColor="#FFD54A" android:pathData="M35,34h6v40h-6z" />
+        <path android:fillColor="#FFD54A" android:pathData="M46,34h6v40h-6z" />
+        <path android:fillColor="#FFD54A" android:pathData="M57,34h6v40h-6z" />
+        <path android:fillColor="#FFD54A" android:pathData="M68,34h6v40h-6z" />
+        <path android:fillColor="#FFD54A" android:pathData="M30.5,69.5L76.5,29.9l3.9,4.6L34.4,74.1z" />
+    </group>
+</vector>
