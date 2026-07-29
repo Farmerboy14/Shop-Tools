@@ -47,6 +47,7 @@ jobs:
           cp android/app/build/outputs/apk/debug/app-debug.apk silage-loads.apk
           gh release view latest >/dev/null 2>&1 || gh release create latest \
             --title "Silage Loads — latest build" \
-            --notes "Install on Android: tap the .apk below, then allow installs from your browser when asked. Installing over an existing copy keeps your loads." \
-            --prerelease
+            --notes "Install on Android: tap the .apk below, then allow installs from your browser when asked. Installing over an existing copy keeps your loads."
+          # Must not be a prerelease, or /releases/latest/download/ 404s.
+          gh release edit latest --prerelease=false --latest
           gh release upload latest silage-loads.apk --clobber
