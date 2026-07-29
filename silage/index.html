@@ -64,7 +64,7 @@
   /* --digits-size is set by JS (unitless); --dim-unit lets landscape rescale it */
   #dimCount{--dim-unit:1vmin; font:600 1px/1 var(--mono); font-variant-numeric:tabular-nums;
             font-size:calc(var(--digits-size, 62) * var(--dim-unit));
-            color:#5c5442; letter-spacing:-.04em;}
+            color:#786d55; letter-spacing:-.04em;}
   #dimClock{font:600 17vmin/1 var(--mono); font-variant-numeric:tabular-nums; color:#6e6550;}
   #dimHint{font:600 11px/1 var(--sans); letter-spacing:.14em; color:#332f26;}
 
@@ -174,11 +174,10 @@
 
     .statgrid{grid-column:1 / -1;}
 
-    /* dim screen: count and clock side by side to use the width */
-    #dim{flex-direction:row; gap:5vmin; flex-wrap:wrap;}
-    #dimCount{--dim-unit:1.35vmin;}
-    #dimClock{font-size:20vmin;}
-    #dimHint{width:100%; text-align:center;}
+    /* dim screen stays stacked (count over clock) so the size difference
+       reads at a glance; trimmed slightly to fit the shorter height */
+    #dim{gap:6px;}
+    #dimCount{--dim-unit:.95vmin;}
   }
 </style>
 </head>
