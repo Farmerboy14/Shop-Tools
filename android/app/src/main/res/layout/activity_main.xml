@@ -386,6 +386,32 @@
                         android:minHeight="48dp"
                         android:text="@string/join_job" />
                 </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/driverBtn"
+                        style="@style/ChunkyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:minHeight="48dp"
+                        android:text="@string/switch_driver" />
+
+                    <Button
+                        android:id="@+id/crewTodayBtn"
+                        style="@style/ChunkyButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:minHeight="48dp"
+                        android:text="@string/crew_today" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- stats -->

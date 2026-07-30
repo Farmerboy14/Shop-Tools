@@ -14,10 +14,12 @@ class AccountActivity : AppCompatActivity() {
 
         val name = findViewById<EditText>(R.id.accountName)
         val vehicle = findViewById<EditText>(R.id.accountVehicle)
+        val truckMode = findViewById<android.widget.CheckBox>(R.id.truckModeCheck)
         val status = findViewById<TextView>(R.id.accountStatus)
 
         name.setText(Sync.myName(this))
         vehicle.setText(Sync.myVehicle(this))
+        truckMode.isChecked = Sync.truckMode(this)
 
         status.text = if (Sync.configured(this)) {
             "Sharing is on. When you're in a shared job, the crew sees your name, " +
@@ -29,6 +31,7 @@ class AccountActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.accountSaveBtn).setOnClickListener {
             Sync.saveProfile(this, name.text.toString().trim(), vehicle.text.toString().trim())
+            Sync.setTruckMode(this, truckMode.isChecked)
             finish()
         }
     }

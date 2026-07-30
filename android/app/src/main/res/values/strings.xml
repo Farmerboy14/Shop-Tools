@@ -39,6 +39,9 @@
     <string name="account_hint">How you show up to the rest of the crew — on their map and in the shared load log. Lives on this phone; no password.</string>
     <string name="your_name">Name</string>
     <string name="your_vehicle">Vehicle (what you drive)</string>
+    <string name="switch_driver">WHO\'S DRIVING</string>
+    <string name="crew_today">CREW TODAY</string>
+    <string name="truck_phone">Truck phone — stays in the vehicle, asks who\'s driving each day</string>
     <string name="delete">DELETE</string>
     <string name="cancel">CANCEL</string>
     <string name="history">HISTORY (THIS JOB)</string>

@@ -32,9 +32,17 @@ object Sync {
     private const val CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789" // no 0/O/1/I/L
 
     data class Driver(
-        val uid: String, val name: String, val vehicle: String,
+        val uid: String, val name: String, val vehicle: String, val driver: String,
         val lat: Double, val lng: Double, val t: Long
-    )
+    ) {
+        /** "JAKE · TRUCK 3" when a shift driver is set, else the account name. */
+        fun label(): String {
+            val who = driver.ifEmpty { name }
+            val rig = if (driver.isEmpty()) vehicle else listOf(name, vehicle)
+                .firstOrNull { it.isNotEmpty() && it != who } ?: ""
+            return if (rig.isEmpty()) who else "$who · $rig"
+        }
+    }
 
     /** Handle for detaching a live listener. */
     class Listening internal constructor(
@@ -83,6 +91,88 @@ object Sync {
 
     fun myName(ctx: Context): String = prefs(ctx).getString("name", "") ?: ""
     fun myVehicle(ctx: Context): String = prefs(ctx).getString("vehicle", "") ?: ""
+
+    // ---- shift driver (truck-phone mode) ------------------------------------
+
+    fun truckMode(ctx: Context): Boolean = prefs(ctx).getBoolean("truck_mode", false)
+
+    fun setTruckMode(ctx: Context, on: Boolean) {
+        prefs(ctx).edit().putBoolean("truck_mode", on).apply()
+    }
+
+    fun myDriver(ctx: Context): String = prefs(ctx).getString("driver", "") ?: ""
+
+    /** When today's driver was last picked; a new day means asking again. */
+    fun driverPickedToday(ctx: Context): Boolean {
+        val when_ = prefs(ctx).getString("driver_day", "")
+        return myDriver(ctx).isNotEmpty() && when_ == LoadStore.todayKey()
+    }
+
+    fun setDriver(ctx: Context, driver: String) {
+        prefs(ctx).edit()
+            .putString("driver", driver)
+            .putString("driver_day", LoadStore.todayKey())
+            .apply()
+        // add to the job roster so every truck offers this name
+        if (!configured(ctx) || driver.isEmpty()) return
+        val code = LoadStore.activeJob(LoadStore.read(ctx)).optString("share")
+        if (code.isEmpty()) return
+        signIn(ctx) { uid ->
+            uid ?: return@signIn
+            val key = driver.replace(Regex("[.#$\\[\\]/]"), " ").trim()
+            if (key.isEmpty()) return@signIn
+            jobs(ctx).child(code).child("roster").child(key)
+                .setValue(mapOf<String, Any>("name" to driver, "t" to System.currentTimeMillis()))
+        }
+    }
+
+    /** Names to offer on the who's-driving screen: roster + members. */
+    fun listRoster(ctx: Context, code: String, done: (List<String>) -> Unit) {
+        if (!configured(ctx)) { done(emptyList()); return }
+        signIn(ctx) { uid ->
+            if (uid == null) { done(emptyList()); return@signIn }
+            jobs(ctx).child(code).get()
+                .addOnSuccessListener { snap ->
+                    val names = LinkedHashSet<String>()
+                    for (child in snap.child("roster").children) {
+                        child.child("name").getValue(String::class.java)?.let { names.add(it) }
+                    }
+                    for (child in snap.child("members").children) {
+                        child.child("name").getValue(String::class.java)
+                            ?.takeIf { it.isNotEmpty() }?.let { names.add(it) }
+                    }
+                    done(names.toList().sorted())
+                }
+                .addOnFailureListener { done(emptyList()) }
+        }
+    }
+
+    /** Today's shared loads, tallied per driver, newest job state. */
+    fun crewToday(ctx: Context, code: String, done: (List<Pair<String, Int>>, Int) -> Unit) {
+        if (!configured(ctx)) { done(emptyList(), 0); return }
+        signIn(ctx) { uid ->
+            if (uid == null) { done(emptyList(), 0); return@signIn }
+            val startOfDay = java.time.LocalDate.now()
+                .atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            jobs(ctx).child(code).child("loads")
+                .orderByChild("t").startAt(startOfDay.toDouble())
+                .get()
+                .addOnSuccessListener { snap ->
+                    val counts = LinkedHashMap<String, Int>()
+                    var total = 0
+                    for (child in snap.children) {
+                        val who = child.child("driver").getValue(String::class.java)
+                            ?.takeIf { it.isNotEmpty() }
+                            ?: child.child("name").getValue(String::class.java)
+                            ?.takeIf { it.isNotEmpty() } ?: "Unknown"
+                        counts[who] = (counts[who] ?: 0) + 1
+                        total++
+                    }
+                    done(counts.entries.sortedByDescending { it.value }.map { Pair(it.key, it.value) }, total)
+                }
+                .addOnFailureListener { done(emptyList(), 0) }
+        }
+    }
 
     fun saveProfile(ctx: Context, name: String, vehicle: String) {
         prefs(ctx).edit().putString("name", name).putString("vehicle", vehicle).apply()
@@ -213,6 +303,7 @@ object Sync {
             val load = HashMap<String, Any>()
             load["uid"] = uid
             load["name"] = myName(ctx)
+            load["driver"] = myDriver(ctx)
             load["t"] = System.currentTimeMillis()
             load["auto"] = auto
             if (lat != null && lng != null) { load["lat"] = lat; load["lng"] = lng }
@@ -235,6 +326,7 @@ object Sync {
             jobs(ctx).child(code).child("pos").child(uid).setValue(
                 mapOf<String, Any>(
                     "name" to myName(ctx), "vehicle" to myVehicle(ctx),
+                    "driver" to myDriver(ctx),
                     "lat" to lat, "lng" to lng, "t" to now
                 )
             )
@@ -259,7 +351,8 @@ object Sync {
                     val lng = child.child("lng").getValue(Double::class.java) ?: continue
                     val name = child.child("name").getValue(String::class.java) ?: "Driver"
                     val vehicle = child.child("vehicle").getValue(String::class.java) ?: ""
-                    drivers.add(Driver(uid, name, vehicle, lat, lng, t))
+                    val shiftDriver = child.child("driver").getValue(String::class.java) ?: ""
+                    drivers.add(Driver(uid, name, vehicle, shiftDriver, lat, lng, t))
                 }
                 onDrivers(drivers)
             }

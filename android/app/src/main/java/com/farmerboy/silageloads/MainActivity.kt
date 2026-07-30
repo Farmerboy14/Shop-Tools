@@ -184,6 +184,8 @@ class MainActivity : AppCompatActivity() {
         }
         shareJobBtn.setOnClickListener { shareFlow() }
         findViewById<Button>(R.id.joinJobBtn).setOnClickListener { joinFlow() }
+        findViewById<Button>(R.id.driverBtn).setOnClickListener { showDriverPicker() }
+        findViewById<Button>(R.id.crewTodayBtn).setOnClickListener { showCrewToday() }
         findViewById<Button>(R.id.undoBtn).setOnClickListener {
             LoadStore.removeLoad(this)
             LoadWidget.refresh(this)
@@ -237,6 +239,7 @@ class MainActivity : AppCompatActivity() {
         attachCrewListeners()
         render()
         armDim()
+        maybePromptDriver()
     }
 
     override fun onPause() {
@@ -286,8 +289,11 @@ class MainActivity : AppCompatActivity() {
         val name = Sync.myName(this)
         val vehicle = Sync.myVehicle(this)
         val code = job.optString("share")
-        val you = if (name.isEmpty()) "Set your name in ACCOUNT so the crew knows who you are."
+        val driver = Sync.myDriver(this)
+        var you = if (name.isEmpty()) "Set your name in ACCOUNT so the crew knows who you are."
             else "You: $name" + (if (vehicle.isEmpty()) "" else " · $vehicle")
+        if (driver.isNotEmpty()) you += "\nDriving: $driver"
+        else if (Sync.truckMode(this)) you += "\nNo driver picked — tap WHO'S DRIVING."
         val line = when {
             !Sync.configured(this) ->
                 "$you\nSharing needs a one-time setup in this build before codes work."
@@ -396,6 +402,94 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    // ---- who's driving (truck-phone mode) -----------------------------------
+
+    private var driverPromptShown = false
+
+    /** Truck phones ask once per day: get in, tap your name, go. */
+    private fun maybePromptDriver() {
+        if (!Sync.truckMode(this) || driverPromptShown) return
+        if (Sync.driverPickedToday(this)) return
+        val code = LoadStore.activeJob(LoadStore.read(this)).optString("share")
+        if (code.isEmpty() || !Sync.configured(this)) return
+        driverPromptShown = true
+        showDriverPicker()
+    }
+
+    private fun showDriverPicker() {
+        val code = LoadStore.activeJob(LoadStore.read(this)).optString("share")
+        if (code.isEmpty() || !Sync.configured(this)) {
+            AlertDialog.Builder(this)
+                .setMessage("Driver pick-lists work on shared jobs — share or join one first.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        Sync.listRoster(this, code) { names ->
+            val options = names.toMutableList()
+            options.add("➕  New name…")
+            AlertDialog.Builder(this)
+                .setTitle("Who's driving?")
+                .setItems(options.toTypedArray()) { _, which ->
+                    if (which == options.size - 1) newDriverDialog()
+                    else {
+                        Sync.setDriver(this, options[which])
+                        render()
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun newDriverDialog() {
+        val input = EditText(this).apply {
+            hint = "Driver's name"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Who's driving?")
+            .setView(input)
+            .setPositiveButton("Go") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) { Sync.setDriver(this, name); render() }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** The boss view: everyone's loads today, tallied per driver, live. */
+    private fun showCrewToday() {
+        val code = LoadStore.activeJob(LoadStore.read(this)).optString("share")
+        if (code.isEmpty() || !Sync.configured(this)) {
+            AlertDialog.Builder(this)
+                .setMessage("Crew totals work on shared jobs — share or join one first.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        Sync.crewToday(this, code) { counts, total ->
+            val lines = StringBuilder()
+            if (counts.isEmpty()) lines.append("No shared loads yet today.")
+            else {
+                for ((who, n) in counts) lines.append(String.format("%-4d %s%n", n, who))
+                lines.append("\nTotal: $total loads")
+            }
+            val body = TextView(this).apply {
+                text = lines.toString()
+                typeface = android.graphics.Typeface.MONOSPACE
+                textSize = 16f
+                setTextColor(getColor(R.color.ink))
+                setPadding(dp(20), dp(12), dp(20), dp(4))
+            }
+            AlertDialog.Builder(this)
+                .setTitle("Crew today · job $code")
+                .setView(body)
+                .setPositiveButton("Close", null)
+                .show()
+        }
+    }
+
     private fun attachCrewListeners() {
         detachCrewListeners()
         val code = LoadStore.activeJob(LoadStore.read(this)).optString("share")
@@ -449,8 +543,7 @@ class MainActivity : AppCompatActivity() {
             crewDrivers.sortedBy { AutoCounter.metresBetween(lat, lng, it.lat, it.lng) }
         } else crewDrivers
         for (driver in sorted.take(3)) {
-            var text = driver.name.uppercase(Locale.getDefault())
-            if (driver.vehicle.isNotEmpty()) text += " · " + driver.vehicle.uppercase(Locale.getDefault())
+            var text = driver.label().uppercase(Locale.getDefault())
             if (lat != null && lng != null) {
                 val meters = AutoCounter.metresBetween(lat, lng, driver.lat, driver.lng)
                 text += " · " + fmtMiles(meters) + " " + Sync.compass(lat, lng, driver.lat, driver.lng)
